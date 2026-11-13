@@ -20,28 +20,30 @@ import (
 	"time"
 
 	"github.com/gtsteffaniak/filebrowser/backend/internal/ffmpeg"
+	"github.com/gtsteffaniak/filebrowser/backend/internal/mediacache"
 	"github.com/gtsteffaniak/filebrowser/backend/internal/utils"
 	"github.com/gtsteffaniak/filebrowser/backend/pkg/settings"
-	"github.com/gtsteffaniak/go-cache/cache"
 	"github.com/gtsteffaniak/go-logger/logger"
 	"github.com/gtsteffaniak/go-media/pkg/media"
 	"golang.org/x/sync/singleflight"
 )
 
-var (
-	subtitleListCache    = cache.NewCache[[]utils.SubtitleTrack](24 * time.Hour)
-	subtitleContentCache = cache.NewCache[string](24 * time.Hour)
+// Probe, duration, and subtitle results are cached in the mediacache package,
+// which the ffmpeg code path shares. A directory listing probes every video
+// child, and the preview flow probes the focused file again; the cache keeps
+// each request from re-reading the same containers. Keys include size and
+// modification time, so an edited file is read again.
 
-	// probeCache caches successful probe results by file identity (path, modtime,
-	// size). A directory listing probes every video child, and the preview flow
-	// probes the focused file again; without this each request re-read the same
-	// containers. Keying on modtime+size means an edited file is re-probed.
-	probeCache = cache.NewCache[ProbeResult](24 * time.Hour)
+// probeGroup coalesces concurrent probes of the same file so a burst of
+// requests for one container reads it once.
+var probeGroup singleflight.Group
 
-	// probeGroup coalesces concurrent probes of the same file so a burst of
-	// requests for one container reads it once.
-	probeGroup singleflight.Group
-)
+func init() {
+	// The ffmpeg HEIC decode path corrects orientation after decoding and needs
+	// the file's irot. internal/ffmpeg cannot import this package, so go-media's
+	// header reader is installed here.
+	ffmpeg.SetHEICDisplayRotationReader(HEICDisplayRotation)
+}
 
 // Enabled reports whether the go-media fast path may run. The admin
 // "Always use ffmpeg" setting turns it off.
@@ -60,9 +62,15 @@ func videoDimensions(info *media.ProbeInfo) (w, h int, ok bool) {
 }
 
 // videoContainerExts are the containers go-media parses for video probes,
-// thumbnails, and embedded subtitles. Other video containers (AVI, WMV, TS, ...)
-// are not go-media targets, so they go straight to ffmpeg with no file open and
-// no log line. go-media reads MOV as MP4.
+// thumbnails, embedded subtitles, and keyframe indexes. go-media reads MOV as
+// MP4.
+//
+// go-media also demuxes AVI, ASF/WMV, MPEG-TS/M2TS, and MPEG-PS (VOB), but their
+// probes are left to ffmpeg on purpose: go-media's results for those containers
+// do not yet match ffprobe (TS/M2TS and PS list no audio streams, PS durations
+// are missing or wrong, AVI misnames MPEG-4 Part 2 and AAC, ASF reports WMA Pro
+// as wmav2). Those files go straight to ffmpeg with no file open and no log
+// line. See videoThumbnailExts for the thumbnail exception.
 var videoContainerExts = map[string]bool{
 	".mp4":  true,
 	".m4v":  true,
@@ -71,11 +79,31 @@ var videoContainerExts = map[string]bool{
 	".webm": true,
 }
 
+// videoThumbnailExts are the containers go-media decodes video thumbnails from:
+// videoContainerExts plus ASF/WMV, whose WMV3 keyframes go-media decodes
+// bit-exact with ffmpeg. WMV1, WMV2, MS-MPEG4, and WVC1 Advanced Profile return
+// an unsupported error and fall back to ffmpeg. AVI, TS/M2TS, and PS stay on
+// ffmpeg: go-media's TS and PS thumbnails scan the whole file for the duration
+// (several times slower than ffmpeg on large files), and AVI seeks by a
+// duration that can be wrong.
+var videoThumbnailExts = map[string]bool{
+	".mp4":  true,
+	".m4v":  true,
+	".mov":  true,
+	".mkv":  true,
+	".webm": true,
+	".wmv":  true,
+	".asf":  true,
+}
+
 // heifImageExts are still-image containers go-media decodes for HEIC preview.
+// AVIF is a HEIF container with an AV1 image item; go-media decodes it in pure
+// Go and applies its irot/imir, like HEIC.
 var heifImageExts = map[string]bool{
 	".heic":  true,
 	".heif":  true,
 	".heics": true,
+	".avif":  true,
 }
 
 const heicDecodeMaxEdge = 16384
@@ -93,15 +121,27 @@ var cameraRawExts = map[string]bool{
 	".dc2": true, ".x3f": true, ".iiq": true, ".nkc": true, ".r3d": true,
 }
 
-// supportsVideoContainer reports whether go-media targets path's container.
+// supportsVideoContainer reports whether go-media targets path's container for
+// probes, embedded subtitles, and keyframe indexes.
 func supportsVideoContainer(path string) bool {
 	return videoContainerExts[strings.ToLower(filepath.Ext(path))]
 }
+
+// supportsVideoThumbnail reports whether go-media targets path's container for
+// video thumbnails.
+func supportsVideoThumbnail(path string) bool {
+	return videoThumbnailExts[strings.ToLower(filepath.Ext(path))]
+}
+
+// supportsHEIFImage reports whether path is a HEIF-family still image
+// (HEIC/HEIF/AVIF) go-media decodes.
 
 func supportsHEIFImage(path string) bool {
 	return heifImageExts[strings.ToLower(filepath.Ext(path))]
 }
 
+// supportsCameraRAW reports whether path is a camera RAW format go-media
+// extracts a preview from.
 func supportsCameraRAW(path string) bool {
 	return cameraRawExts[strings.ToLower(filepath.Ext(path))]
 }
@@ -133,16 +173,26 @@ func logUnsupported(op, path, reason string) {
 
 // openFile opens path for go-media, which reads through io.ReaderAt.
 func openFile(path string) (*os.File, int64, error) {
-	f, err := os.Open(path)
+	f, info, err := openFileInfo(path)
 	if err != nil {
 		return nil, 0, err
+	}
+	return f, info.Size(), nil
+}
+
+// openFileInfo opens path and returns its FileInfo, which also gives the
+// shared cache key.
+func openFileInfo(path string) (*os.File, os.FileInfo, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
 	}
 	info, err := f.Stat()
 	if err != nil {
 		_ = f.Close()
-		return nil, 0, err
+		return nil, nil, err
 	}
-	return f, info.Size(), nil
+	return f, info, nil
 }
 
 // ffprobeFormatNames maps go-media containers to the format_name strings ffprobe
@@ -179,30 +229,25 @@ func probeFast(path string) (ProbeResult, bool) {
 		return ProbeResult{}, false
 	}
 
-	f, size, err := openFile(path)
+	f, info, err := openFileInfo(path)
 	if err != nil {
 		logFallback("probe", path, err)
 		return ProbeResult{}, false
 	}
 	defer f.Close()
 
-	info, err := f.Stat()
-	if err != nil {
-		logFallback("probe", path, err)
-		return ProbeResult{}, false
-	}
-	cacheKey := probeCacheKey(path, info.ModTime().UnixNano(), size)
-	if res, ok := probeCache.Get(cacheKey); ok {
+	cacheKey := mediacache.FromFileInfo(path, info).String()
+	if res, ok := mediacache.Probes.Get(cacheKey); ok {
 		return res, true
 	}
 
 	// Coalesce concurrent probes of the same file into one container read.
 	v, err, _ := probeGroup.Do(cacheKey, func() (any, error) {
-		res, ok := parseProbe(path, f, size)
+		res, ok := parseProbe(path, f, info.Size())
 		if !ok {
 			return nil, errProbeUnsupported
 		}
-		probeCache.Set(cacheKey, res)
+		mediacache.Probes.Set(cacheKey, res)
 		return res, nil
 	})
 	if err != nil {
@@ -218,12 +263,6 @@ func probeFast(path string) (ProbeResult, bool) {
 // errProbeUnsupported marks a probe that go-media chose not to answer. It carries
 // no detail because parseProbe already logged the specific reason.
 var errProbeUnsupported = errors.New("probe unsupported")
-
-// probeCacheKey identifies a file version for caching: path plus modtime and size.
-// An edited file gets a new key, so stale metadata is never served.
-func probeCacheKey(path string, modTimeNanos, size int64) string {
-	return fmt.Sprintf("probe:%s:%d:%d", path, modTimeNanos, size)
-}
 
 // parseProbe reads a container and builds a ProbeResult. It reports false when
 // go-media should defer to ffmpeg, having logged why.
@@ -280,14 +319,18 @@ func durationFast(path string) (float64, bool) {
 	if !Enabled() {
 		return 0, false
 	}
-	f, size, err := openFile(path)
+	f, info, err := openFileInfo(path)
 	if err != nil {
 		logFallback("duration", path, err)
 		return 0, false
 	}
 	defer f.Close()
 
-	res, err := media.Duration(f, size)
+	cacheKey := mediacache.FromFileInfo(path, info).String()
+	if d, ok := mediacache.Durations.Get(cacheKey); ok {
+		return d, true
+	}
+	res, err := media.Duration(f, info.Size())
 	if err != nil {
 		logFallback("duration", path, err)
 		return 0, false
@@ -296,7 +339,9 @@ func durationFast(path string) (float64, bool) {
 		// Unknown duration is not an error; ffmpeg may still find one.
 		return 0, false
 	}
-	return res.Duration.Seconds(), true
+	d := res.Duration.Seconds()
+	mediacache.Durations.Set(cacheKey, d)
+	return d, true
 }
 
 // AudioInfo is the tag, lyrics availability, and cover art FileBrowser reads
@@ -384,7 +429,9 @@ func lyricsFast(path string) (text, format string, ok bool) {
 
 // EmbeddedSubtitles lists embedded subtitle tracks. go-media supports MKV, WebM,
 // and MP4 only. Other containers are reported as unsupported, not as "no
-// subtitles", because go-media returns an empty list for them.
+// subtitles", because go-media returns an empty list for them. modtime is kept
+// for API compatibility; the cache key comes from the file's current size and
+// modification time.
 // legacy is the ffmpeg subtitle detection, run only in shadow mode.
 func EmbeddedSubtitles(path string, modtime time.Time, legacy Legacy[[]utils.SubtitleTrack]) ([]utils.SubtitleTrack, bool) {
 	return timed("subtitle list", path, legacy, subtitleListDiff, func() ([]utils.SubtitleTrack, bool) {
@@ -399,19 +446,20 @@ func embeddedSubtitlesFast(path string, modtime time.Time) ([]utils.SubtitleTrac
 	if !supportsVideoContainer(path) {
 		return nil, false
 	}
-	key := fmt.Sprintf("embedded_subtitles:%s:%d", path, modtime.Unix())
-	if cached, ok := subtitleListCache.Get(key); ok {
-		return cached, true
-	}
-
-	f, size, err := openFile(path)
+	_ = modtime
+	f, st, err := openFileInfo(path)
 	if err != nil {
 		logFallback("subtitle list", path, err)
 		return nil, false
 	}
 	defer f.Close()
 
-	info, err := media.Probe(f, size)
+	key := mediacache.FromFileInfo(path, st).String()
+	if cached, ok := mediacache.SubtitleTracks.Get(key); ok {
+		return cached, true
+	}
+
+	info, err := media.Probe(f, st.Size())
 	if err != nil {
 		logFallback("subtitle list", path, err)
 		return nil, false
@@ -433,7 +481,7 @@ func embeddedSubtitlesFast(path string, modtime time.Time) ([]utils.SubtitleTrac
 		})
 	}
 	tracks := ffmpeg.BuildSubtitleTracks(streams)
-	subtitleListCache.Set(key, tracks)
+	mediacache.SubtitleTracks.Set(key, tracks)
 	return tracks, true
 }
 
@@ -453,24 +501,19 @@ func extractSubtitleFast(path string, streamIndex int) (string, bool) {
 	if !supportsVideoContainer(path) {
 		return "", false
 	}
-	st, err := os.Stat(path)
-	if err != nil {
-		logFallback("subtitle extract", path, err)
-		return "", false
-	}
-	key := fmt.Sprintf("subtitle_content:%s:%d:%d", path, streamIndex, st.ModTime().Unix())
-	if content, ok := subtitleContentCache.Get(key); ok {
-		return content, true
-	}
-
-	f, size, err := openFile(path)
+	f, st, err := openFileInfo(path)
 	if err != nil {
 		logFallback("subtitle extract", path, err)
 		return "", false
 	}
 	defer f.Close()
 
-	vtt, err := media.ExtractEmbeddedSubtitle(f, size, streamIndex)
+	key := mediacache.FromFileInfo(path, st).Stream(streamIndex)
+	if content, ok := mediacache.SubtitleContent.Get(key); ok {
+		return content, true
+	}
+
+	vtt, err := media.ExtractEmbeddedSubtitle(f, st.Size(), streamIndex)
 	if err != nil {
 		logFallback("subtitle extract", path, err)
 		return "", false
@@ -479,7 +522,7 @@ func extractSubtitleFast(path string, streamIndex int) (string, bool) {
 		logFallback("subtitle extract", path, errors.New("empty subtitle output"))
 		return "", false
 	}
-	subtitleContentCache.Set(key, vtt)
+	mediacache.SubtitleContent.Set(key, vtt)
 	return vtt, true
 }
 
@@ -501,7 +544,7 @@ func videoThumbnailFast(path string, width, height, quality int, seekPercent flo
 	if !Enabled() {
 		return nil, false
 	}
-	if !supportsVideoContainer(path) {
+	if !supportsVideoThumbnail(path) {
 		return nil, false
 	}
 	f, size, err := openFile(path)
