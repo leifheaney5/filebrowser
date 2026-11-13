@@ -44,7 +44,7 @@ const titles: Record<string, string> = {
 };
 
 const routes: RouteRecordRaw[] = [
-  { path: "/", redirect: "/workspace" },
+  { path: "/", redirect: "/files/" },
   {
     path: "/workspace",
     name: "Workspace",
@@ -246,7 +246,7 @@ router.beforeResolve(async (to, from) => {
   }
 
   if (to.path.endsWith("/login") && getters.isLoggedIn()) {
-    return { path: "/workspace" };
+    return { path: "/files/" };
   }
 
   return true;

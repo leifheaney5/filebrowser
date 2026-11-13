@@ -115,7 +115,7 @@ describe('TOTP login and enrollment', () => {
       });
     }
     expect(store.mutations.setCurrentUser).toHaveBeenCalledWith(user);
-    expect(router.push).toHaveBeenCalledWith('/workspace');
+    expect(router.push).toHaveBeenCalledWith('/files/');
     expect(prompt.succeeded).toBe(true);
     expect(store.mutations.closeTopPrompt).toHaveBeenCalledOnce();
   });
@@ -176,7 +176,7 @@ describe('TOTP login and enrollment', () => {
     expect(paths()).toEqual(['/api/auth/login', '/api/users']);
     expect(store.mutations.showPrompt).not.toHaveBeenCalled();
     expect(store.state.user).toEqual(noOtpUser);
-    expect(router.push).toHaveBeenCalledWith({ path: '/workspace' });
+    expect(router.push).toHaveBeenCalledWith({ path: '/files/' });
   });
 
   it('uses generate and verify before logging in after first-time enforced enrollment', async () => {

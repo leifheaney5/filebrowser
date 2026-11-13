@@ -4,9 +4,10 @@ This fork is based on FileBrowser Quantum `v2.1.4-beta`. The Leif deployment
 still runs its pinned `v2.0.8-beta` runtime until a separately reviewed upgrade
 is prepared. Workspace features do not change the account database schema,
 authentication, or source mounts.
-The workspace is at `/workspace`; `/` and the default login redirect open it.
+The repository's original file browser is the default at `/` and after login.
+The custom workspace remains available at `/workspace`.
 Existing file viewers, shares, settings, and the original interface remain
-available. The original interface's sidebar links back to Workspace.
+available. The original interface's sidebar links to Workspace.
 
 ## Organizing behavior
 
