@@ -390,7 +390,7 @@ export default {
       this.inProgress = true;
       event.preventDefault();
       event.stopPropagation();
-      const redirect = sanitizePostLoginRedirect(state.route.query.redirect);
+      const redirect = sanitizePostLoginRedirect(state.route.query.redirect, "/workspace");
 
       let captcha = "";
       if (globalVars.recaptcha) {

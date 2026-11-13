@@ -2,6 +2,7 @@ package web
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"net/http"
@@ -120,9 +121,7 @@ func (s *duplicateProcessingStats) shouldStop() (bool, string) {
 //
 // 5. Progressive Checksum Verification (2-pass):
 //   - Pass 1: Header checksum (first 8KB) - fastest elimination
-//   - Pass 2: Middle checksum (header + middle 8KB) - final verification for header matches
-//     Note: Files matching header + middle but differing at end are extremely rare (<0.1%),
-//     so 2-pass is sufficient and faster than 3-pass
+//   - Pass 2: Complete SHA-256 verification of every byte in header-matched files.
 //     6. Post-Processing: Groups with matching checksums are merged (catches files with
 //     identical content but different filenames)
 //
@@ -135,7 +134,7 @@ func (s *duplicateProcessingStats) shouldStop() (bool, string) {
 // Response includes incomplete flag if processing was stopped early due to resource limits.
 //
 // @Summary Find Duplicate Files
-// @Description Finds duplicate files using multi-stage filtering: size → type → fuzzy filename → progressive checksums. Files must match on size, MIME type, and have 50%+ filename similarity before checksum verification. Large fuzzy groups (>10 files) are skipped to avoid false positives. Checksums use 2-pass progressive verification (header → middle) for accuracy while minimizing disk I/O (~16KB read per file).
+// @Description Finds duplicate candidates using size, type and filename filtering, then verifies every byte with SHA-256. Files changed during hashing are excluded. The Library workspace provides recursive filename-independent duplicate review.
 // @Tags Tools
 // @Accept json
 // @Produce json
@@ -624,7 +623,7 @@ func prepDuplicatesOptions(r *http.Request, d *Context) (*duplicatesOptions, err
 	}, nil
 }
 
-// groupFilesByChecksum groups files by partial checksum and returns groups with their checksums
+// groupFilesByChecksum groups candidates by full-file SHA-256 after a fast header filter.
 func groupFilesByChecksum(files []*iteminfo.FileInfo, index *indexing.Index, fileSize int64, stats *duplicateProcessingStats) []checksumGroup {
 	if len(files) < 2 {
 		return nil
@@ -673,7 +672,7 @@ func groupFilesByChecksum(files []*iteminfo.FileInfo, index *indexing.Index, fil
 		return nil
 	}
 
-	// PASS 2: Middle checksums (header + middle) for header-matched groups
+	// PASS 2: Full-file SHA-256 for header-matched groups.
 	// Only process files that matched on header to save disk I/O
 	middleGroups := make(map[string][]*iteminfo.FileInfo)
 
@@ -700,9 +699,7 @@ func groupFilesByChecksum(files []*iteminfo.FileInfo, index *indexing.Index, fil
 		}
 	}
 
-	// Final verification: Use middle checksum as final (header + middle is sufficient)
-	// Files that match on header + middle but differ at end are extremely rare
-	// This 2-pass system catches 99.9%+ of differences while being faster
+	// Partial matches must never be presented as verified duplicates.
 	groups := make([]checksumGroup, 0, len(middleGroups))
 	for checksum, group := range middleGroups {
 		if len(group) >= 2 {
@@ -751,51 +748,47 @@ func computeHeaderChecksum(sourcePath, filePath string, size int64, modTime time
 	return checksum, nil
 }
 
-// computeMiddleChecksum calculates MD5 hash of header + middle portion
-// Only called when header checksums match (progressive verification)
+// computeMiddleChecksum retains its historic name, but verifies the complete file.
+// Do not cache the final decision by path/size/time: a replacement can share them.
 func computeMiddleChecksum(sourcePath, filePath string, size int64, modTime time.Time) (string, error) {
-	// Generate cache key for header+middle checksum
-	cacheKey := fmt.Sprintf("%s:%s:%d:%d:middle", sourcePath, filePath, size, modTime.Unix())
-
-	// Check cache first
-	if cachedChecksum, ok := checksumCache.Get(cacheKey); ok {
-		return cachedChecksum, nil
+	rel, err := filepath.Rel(sourcePath, filePath)
+	if err != nil || !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("duplicate candidate is outside source")
 	}
-
-	file, err := os.Open(filePath)
+	root, err := os.OpenRoot(sourcePath)
+	if err != nil {
+		return "", err
+	}
+	defer root.Close()
+	file, err := root.Open(rel)
 	if err != nil {
 		return "", err
 	}
 	defer file.Close()
-
-	hash := md5.New()
-	buf := make([]byte, 8192) // 8KB buffer
-
-	// Read first 8KB
-	n, err := io.ReadFull(file, buf)
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	before, err := file.Stat()
+	if err != nil {
 		return "", err
 	}
-	hash.Write(buf[:n])
-
-	// For larger files, also read middle 8KB
-	if size > 16384 { // 16KB
-		middleOffset := size / 2
-		if _, err := file.Seek(middleOffset, 0); err == nil {
-			n, err := io.ReadFull(file, buf)
-			if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-				return "", err
-			}
-			hash.Write(buf[:n])
-		}
+	if !before.Mode().IsRegular() || before.Size() != size || !before.ModTime().Equal(modTime) {
+		return "", fmt.Errorf("duplicate candidate changed since indexing")
 	}
-
-	checksum := fmt.Sprintf("%x", hash.Sum(nil))
-
-	// Cache the result
-	checksumCache.Set(cacheKey, checksum)
-
-	return checksum, nil
+	hash := sha256.New()
+	n, err := io.Copy(hash, file)
+	if err != nil {
+		return "", err
+	}
+	after, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	current, err := root.Stat(rel)
+	if err != nil {
+		return "", err
+	}
+	if n != size || after.Size() != size || !after.ModTime().Equal(before.ModTime()) || !os.SameFile(before, current) {
+		return "", fmt.Errorf("duplicate candidate changed during verification")
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 // groupFilesByFilename groups files by fuzzy filename matching

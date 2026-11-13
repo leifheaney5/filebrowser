@@ -28,6 +28,7 @@ const titles: Record<string, string> = {
   /** Same component as Share; name differs for /public optional-auth routes. */
   PublicShare: translate("general.share"),
   Files: translate("general.files"),
+  Workspace: "Workspace",
   Tools: translate("tools.title"),
   ChildTool: translate("tools.title"),
   Settings: translate("general.settings"),
@@ -43,6 +44,13 @@ const titles: Record<string, string> = {
 };
 
 const routes: RouteRecordRaw[] = [
+  { path: "/", redirect: "/workspace" },
+  {
+    path: "/workspace",
+    name: "Workspace",
+    component: () => import("@/views/Organizer.vue"),
+    meta: { requiresAuth: true },
+  },
   {
     path: "/login",
     name: "Login",
@@ -238,7 +246,7 @@ router.beforeResolve(async (to, from) => {
   }
 
   if (to.path.endsWith("/login") && getters.isLoggedIn()) {
-    return { path: "/files/" };
+    return { path: "/workspace" };
   }
 
   return true;

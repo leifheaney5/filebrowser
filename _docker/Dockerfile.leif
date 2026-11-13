@@ -1,0 +1,12 @@
+# Package a locally built Linux binary and frontend using Leif's exact runtime.
+# Build context: output/leif-package, containing filebrowser and frontend/.
+FROM gtstef/filebrowser@sha256:5a18725e2482cf23682758e59c8be3153364eb8ea8eb080f9dc17cd1c06a6bc0
+ARG REVISION
+USER root
+RUN rm -rf /home/filebrowser/internal/web/dist
+COPY --chown=1000:1000 filebrowser /home/filebrowser/filebrowser
+COPY --chown=1000:1000 frontend/ /home/filebrowser/internal/web/dist/
+LABEL org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.version="v2.0.8-beta-leif-workspace.1" \
+      org.opencontainers.image.title="Leif File Workspace"
+USER filebrowser

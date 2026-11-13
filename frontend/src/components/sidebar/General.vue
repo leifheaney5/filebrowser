@@ -1,4 +1,8 @@
 <template>
+  <router-link v-if="!isInvalidShare && user.username && user.username !== 'anonymous'" to="/workspace" class="workspace-link">
+    <i class="material-symbols" aria-hidden="true">grid_view</i>
+    Workspace
+  </router-link>
   <div class="card headline-card">
     <div v-if="isDataLoaded && shouldShowLogin" class="card-wrapper user-card" :class="{ 'extra-padding': !disableQuickToggles }">
       <div v-if="settingsAllowed" class="inner-card user-card__profile">
@@ -70,6 +74,20 @@
   <!-- Sidebar Links Component (replaces sources) -->
   <SidebarLinks />
 </template>
+
+<style scoped>
+.workspace-link {
+  display: flex;
+  align-items: center;
+  gap: 0.65em;
+  padding: 0.9em 1.2em;
+  margin: 0.6em;
+  color: var(--primaryColor);
+  border: 1px solid currentColor;
+  border-radius: 0.65em;
+  font-weight: 600;
+}
+</style>
 
 <script>
 import { logout } from "@/utils/auth";

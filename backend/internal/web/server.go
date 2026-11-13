@@ -84,6 +84,14 @@ func StartHttp(ctx context.Context, deps Deps, shutdownComplete chan struct{}) {
 	}
 
 	initRuntime(deps, fs)
+	// Start durable queues before serving requests so pending work can continue
+	// without a browser reconnecting after a restart.
+	if err := InitOrganizer(); err != nil {
+		logger.Errorf("organizing workspace unavailable: %v", err)
+	}
+	if err := initializeLibrary(); err != nil {
+		logger.Errorf("library workspace unavailable: %v", err)
+	}
 
 	router := http.NewServeMux()
 	api := http.NewServeMux()

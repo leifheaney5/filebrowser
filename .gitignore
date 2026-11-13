@@ -50,6 +50,8 @@ frontend/.tmp-icons-*
 
 .DS_Store
 node_modules
+/output/
+/frontend/.playwright-cli/
 
 # local env files
 .env.local

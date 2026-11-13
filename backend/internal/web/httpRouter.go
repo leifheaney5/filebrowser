@@ -157,6 +157,11 @@ func configureHTTPRouter(router, api, publicRoutes, publicApi *http.ServeMux) {
 	api.HandleFunc("GET /tools/activity/grouped", withUser(withToolAccess(users.ToolActivityViewer)(GroupedHandler)))
 	api.HandleFunc("GET /tools/activity/export", withUser(withToolAccess(users.ToolActivityViewer)(ExportHandler)))
 
+	// The organizing workspace uses the same authenticated user and source rules.
+	api.HandleFunc("/organizer/", withUser(organizerHandler))
+	api.HandleFunc("/library", withUser(libraryHandler))
+	api.HandleFunc("/library/", withUser(libraryHandler))
+
 	// ========================================
 	// Media Routes - /api/media/ (with public routes)
 	// ========================================
