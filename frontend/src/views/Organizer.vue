@@ -722,6 +722,11 @@ html.dark-mode .organizer :focus-visible {
     border-color: #3a4853;
     background: #151f27;
   }
+
+  .organizer .table-heading > .sort-heading:nth-of-type(2),
+  .organizer .table-heading > .sort-heading:nth-of-type(4) {
+    display: none;
+  }
 }
 </style>
 
