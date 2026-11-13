@@ -243,15 +243,25 @@ export async function bulkDelete(items) {
   }
   try {
     const apiPath = getApiPath('resources/bulk')
-    const response = await fetch(apiPath, {
+    const opts = {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'sessionId': state.sessionId,
       },
-      credentials: 'same-origin',
       body: JSON.stringify(items),
-    })
+    }
+    let response
+    try {
+      response = await fetchURL(apiPath, opts)
+    } catch (error) {
+      // A tab may wake after its session expires, before the keep-alive timer
+      // gets a chance to renew it. Retry this idempotently rejected request once.
+      if (error.status !== 401) {
+        throw error
+      }
+      await renew()
+      response = await fetchURL(apiPath, opts)
+    }
     const data = await response.json()
     // 200 = all succeeded, 207 = partial success (some succeeded, some failed)
     if (response.status === 200 || response.status === 207) {
@@ -270,9 +280,8 @@ export async function bulkDelete(items) {
     }
     throw error
   } catch (err) {
-    if (!err.status || (err.status !== 500 && err.status !== 200 && err.status !== 207)) {
-      notify.showError(err.message || 'Error performing bulk delete')
-    }
+    // Callers own error presentation so the delete prompt does not show the
+    // same failure twice (once here and once in its catch handler).
     throw err
   }
 }
