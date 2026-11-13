@@ -1,7 +1,9 @@
 # Leif File Workspace
 
-This branch extends the exact Quantum revision running on Leif, `eadc7fae`,
-without changing its account database schema, authentication, or source mounts.
+This fork is based on FileBrowser Quantum `v2.1.4-beta`. The Leif deployment
+still runs its pinned `v2.0.8-beta` runtime until a separately reviewed upgrade
+is prepared. Workspace features do not change the account database schema,
+authentication, or source mounts.
 The workspace is at `/workspace`; `/` and the default login redirect open it.
 Existing file viewers, shares, settings, and the original interface remain
 available. The original interface's sidebar links back to Workspace.

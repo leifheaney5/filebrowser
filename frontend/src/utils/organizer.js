@@ -32,10 +32,26 @@ export function selectRange(items, selected, anchor, index, { shift = false, tog
   return next;
 }
 
-export function visibleItems(items, query, category, sort, direction) {
+export function visibleItems(items, query, category, sort, direction, filters = {}) {
   const needle = query.trim().toLocaleLowerCase();
+  const sizeInBytes = value => value === '' || value === undefined || !Number.isFinite(Number(value)) || Number(value) < 0 ? null : Number(value) * 1024 * 1024;
+  const dateStart = value => {
+    if (!value) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    const timestamp = new Date(year, month - 1, day).getTime();
+    return Number.isFinite(timestamp) ? timestamp : null;
+  };
+  const minSize = sizeInBytes(filters.minSize);
+  const maxSize = sizeInBytes(filters.maxSize);
+  const after = dateStart(filters.modifiedAfter);
+  const before = dateStart(filters.modifiedBefore);
+  const beforeExclusive = before === null ? null : new Date(before).setDate(new Date(before).getDate() + 1);
   const filtered = items.filter(item => (!needle || item.name.toLocaleLowerCase().includes(needle)) &&
-    (!category || (category === 'directory' ? isFolder(item) : !isFolder(item) && (item.type || '').startsWith(category))));
+    (!category || (category === 'directory' ? isFolder(item) : !isFolder(item) && (item.type || '').startsWith(category))) &&
+    (isFolder(item) || (minSize === null || Number(item.size) >= minSize)) &&
+    (isFolder(item) || (maxSize === null || Number(item.size) <= maxSize)) &&
+    (isFolder(item) || after === null || (Number.isFinite(Date.parse(item.modified)) && Date.parse(item.modified) >= after)) &&
+    (isFolder(item) || beforeExclusive === null || (Number.isFinite(Date.parse(item.modified)) && Date.parse(item.modified) < beforeExclusive)));
   const value = item => sort === 'extension' ? item.name.split('.').slice(1).pop() || '' : item[sort];
   return filtered.sort((a, b) => {
     if (isFolder(a) !== isFolder(b)) return isFolder(a) ? -1 : 1;
