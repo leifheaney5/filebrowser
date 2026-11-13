@@ -1,6 +1,29 @@
 export const itemKey = item => JSON.stringify([item.source, item.path]);
 export const isFolder = item => item.type === 'directory' || item.isDir === true;
 
+export function organizerFilterCount(query, category, filters = {}) {
+  return [query, category, filters.minSize, filters.maxSize, filters.modifiedAfter, filters.modifiedBefore]
+    .filter(value => String(value ?? '').trim() !== '').length;
+}
+
+export function duplicateReviewSelection(group, selectedKeeperKey) {
+  const files = Array.isArray(group?.files) ? group.files : [];
+  if (!files.length || typeof group?.sha256 !== 'string' || !group.sha256) {
+    return { keeper: null, copies: [], snapshots: [] };
+  }
+
+  const keeper = files.find(file => itemKey(file) === selectedKeeperKey) || files[0];
+  const copies = files.filter(file => itemKey(file) !== itemKey(keeper));
+  const keeperIdentity = { source: keeper.source, path: keeper.path };
+  const snapshots = copies.map(file => ({
+    key: itemKey(file),
+    sha256: group.sha256,
+    keeper: keeperIdentity,
+  }));
+
+  return { keeper, copies, snapshots };
+}
+
 export function normalizePath(path) {
   const parts = [];
   for (const part of String(path || '/').split('/')) {

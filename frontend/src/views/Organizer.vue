@@ -4,41 +4,171 @@
       <router-link class="workspace-brand" to="/workspace"><span class="brand-mark">{{ $t('organizer.f') }}</span><span>{{ $t('organizer.file') }}<span class="brand-light">{{ $t('organizer.space') }}</span></span></router-link>
       <p class="nav-caption">{{ $t('organizer.yourWorkspace') }}</p>
       <nav>
-        <button v-for="entry in sections" :key="entry.id" :class="{ active: tab === entry.id }" @click="switchTab(entry.id)"><i class="material-symbols">{{ entry.icon }}</i>{{ entry.name }}<span v-if="entry.id === 'activity' && runningJobs" class="nav-count">{{ runningJobs }}</span></button>
+        <button type="button" v-for="entry in sections" :key="entry.id" :class="{ active: tab === entry.id }" @click="switchTab(entry.id)"><i class="material-symbols">{{ entry.icon }}</i>{{ entry.name }}<span v-if="entry.id === 'activity' && runningJobs" class="nav-count">{{ runningJobs }}</span></button>
       </nav>
-      <div class="nav-heading"><p class="nav-caption">{{ $t('organizer.pinnedLocations') }}</p><button title="Pin this folder" aria-label="Pin this folder" :disabled="!source || tab !== 'files'" @click="toggleFavorite"><i class="material-symbols">add</i></button></div>
-      <button v-for="favorite in favorites" :key="itemKey(favorite)" class="favorite-link" :title="`${favorite.source} · ${favorite.path}`" @click="navigate(favorite.source, favorite.path)"><i class="material-symbols">folder</i><span>{{ favorite.name }}</span></button>
+      <div class="nav-heading"><p class="nav-caption">{{ $t('organizer.pinnedLocations') }}</p><button type="button" title="Pin this folder" aria-label="Pin this folder" :disabled="!source || tab !== 'files'" @click="toggleFavorite"><i class="material-symbols">add</i></button></div>
+      <button type="button" v-for="favorite in favorites" :key="itemKey(favorite)" class="favorite-link" :title="`${favorite.source} · ${favorite.path}`" @click="navigate(favorite.source, favorite.path)"><i class="material-symbols">folder</i><span>{{ favorite.name }}</span></button>
       <p v-if="!favorites.length" class="nav-hint">{{ $t('organizer.keepYourEverydayFoldersClosePinOneAsYouBrowse') }}</p>
       <div class="nav-bottom"><span class="connection-dot"></span><span>{{ $t('organizer.leifWorkspace') }}</span><router-link to="/settings" aria-label="Settings" title="Settings"><i class="material-symbols">settings</i></router-link></div>
     </aside>
 
     <main class="workspace-main">
-      <header class="workspace-top"><span class="workspace-eyebrow">{{ $t('organizer.aLittleRoomForEverything') }}</span><div class="top-actions"><button @click="openTransfers"><i class="material-symbols">sync_alt</i><span>{{ $t('organizer.transfers') }}</span><span v-if="transferCount" class="nav-count">{{ transferCount }}</span></button><router-link :to="source ? buildItemUrl(source, path) : '/files/'" title="Open original interface"><i class="material-symbols">open_in_new</i></router-link><span class="user-avatar" :title="state.user.username">{{ userInitial }}</span></div></header>
+      <header class="workspace-top"><span class="workspace-eyebrow">{{ $t('organizer.aLittleRoomForEverything') }}</span><div class="top-actions"><button type="button" @click="openTransfers"><i class="material-symbols">sync_alt</i><span>{{ $t('organizer.transfers') }}</span><span v-if="transferCount" class="nav-count">{{ transferCount }}</span></button><router-link :to="source ? buildItemUrl(source, path) : '/files/'" title="Open original interface"><i class="material-symbols">open_in_new</i></router-link><span class="user-avatar" :title="state.user.username">{{ userInitial }}</span></div></header>
       <section class="workspace-content">
-        <div class="page-heading"><div><p class="eyebrow">{{ sectionSubtitle }}</p><h1>{{ pageTitle }}</h1><p class="page-description">{{ sectionDescription }}</p></div><button v-if="tab === 'files' && canCreate" class="primary" @click="upload"><i class="material-symbols">upload</i>{{ $t('organizer.uploadFiles') }}</button><button v-if="tab === 'library'" class="primary" :disabled="busy || scanRunning || !source" @click="startScan"><i class="material-symbols">refresh</i>{{ scanRunning ? $t('organizer.scanning') : $t('organizer.indexThisFolder') }}</button></div>
-        <div v-if="error" class="workspace-error" role="alert"><i class="material-symbols">error</i><span>{{ error }}</span><button aria-label="Dismiss error" @click="error = ''">{{ $t('organizer.separator') }}</button></div>
+        <div class="page-heading"><div><p class="eyebrow">{{ sectionSubtitle }}</p><h1>{{ pageTitle }}</h1><p class="page-description">{{ sectionDescription }}</p></div><button type="button" v-if="tab === 'files' && canCreate" class="primary" @click="upload"><i class="material-symbols">upload</i>{{ $t('organizer.uploadFiles') }}</button><button type="button" v-if="tab === 'library'" class="primary" :disabled="busy || scanRunning || !source" @click="startScan"><i class="material-symbols">refresh</i>{{ scanRunning ? $t('organizer.scanning') : $t('organizer.indexThisFolder') }}</button></div>
+        <div v-if="error" class="workspace-error" role="alert"><i class="material-symbols">error</i><span>{{ error }}</span><button type="button" aria-label="Dismiss error" @click="error = ''">{{ $t('organizer.separator') }}</button></div>
         <p v-if="notice" class="workspace-notice" role="status">{{ notice }}</p>
 
         <template v-if="tab === 'files' || tab === 'library'">
-          <div class="location-bar"><select v-model="source" aria-label="Storage source" @change="changeSource"><option v-for="name in sources" :key="name" :value="name">{{ name }}</option></select><span class="location-divider">{{ $t('organizer.separator2') }}</span><form class="address-form" @submit.prevent="navigate(source, address)"><input ref="addressInput" v-model="address" aria-label="Folder path" title="Folder path · Ctrl+L"/><button type="submit" title="Go to folder" aria-label="Go to folder"><i class="material-symbols">arrow_forward</i></button></form><button :class="{ pinned: isPinned }" :aria-pressed="isPinned" :title="isPinned ? 'Unpin folder' : 'Pin folder'" aria-label="Toggle favorite" @click="toggleFavorite"><i class="material-symbols" :textContent="isPinned ? 'star' : 'star_border'" aria-hidden="true"></i></button><button title="Parent folder" aria-label="Parent folder" :disabled="path === '/'" @click="navigate(source, getParentDir(path))"><i class="material-symbols">arrow_upward</i></button><button title="Refresh" aria-label="Refresh" :disabled="busy" @click="refresh(true)"><i class="material-symbols">refresh</i></button></div>
-          <div class="browser-tools"><label class="filter-input"><i class="material-symbols">search</i><input v-model="query" :placeholder="tab === 'library' ? 'Search names, paths, tags…' : 'Find in this folder…'" :aria-label="tab === 'library' ? 'Search indexed library' : 'Filter this folder'"/><kbd>{{ $t('organizer.separator2') }}</kbd></label><select v-if="tab === 'files'" v-model="category" aria-label="Filter by type"><option value="">{{ $t('organizer.allTypes') }}</option><option value="directory">{{ $t('organizer.folders') }}</option><option value="image">{{ $t('organizer.images') }}</option><option value="video">{{ $t('organizer.video') }}</option><option value="audio">{{ $t('organizer.audio') }}</option><option value="text">{{ $t('organizer.text') }}</option><option value="application">{{ $t('organizer.documentsOther') }}</option></select><button v-if="tab === 'files'" class="filter-toggle" :class="{ active: showFilters }" :aria-expanded="showFilters" @click="showFilters = !showFilters"><i class="material-symbols">tune</i>{{ $t('organizer.moreFilters') }}<span v-if="activeFilterCount">{{ activeFilterCount }}</span></button><select v-model="sort" :aria-label="$t('organizer.sortBy')"><option value="name">{{ $t('organizer.name') }}</option><option value="modified">{{ $t('organizer.modifiedDate') }}</option><option value="size">{{ $t('organizer.fileSize') }}</option><option value="type">{{ $t('organizer.type') }}</option><template v-if="tab === 'library'"><option value="capturedAt">{{ $t('organizer.captureDate') }}</option><option value="width">{{ $t('organizer.width') }}</option><option value="height">{{ $t('organizer.height') }}</option><option value="duration">{{ $t('organizer.duration') }}</option><option value="artist">{{ $t('organizer.artist') }}</option><option value="album">{{ $t('organizer.album') }}</option><option value="title">{{ $t('organizer.title') }}</option><option value="tags">{{ $t('organizer.tags') }}</option></template><option v-else value="extension">{{ $t('organizer.extension') }}</option></select><button :aria-label="direction === 'asc' ? 'Sort descending' : 'Sort ascending'" @click="direction = direction === 'asc' ? 'desc' : 'asc'"><i class="material-symbols" :textContent="direction === 'asc' ? 'arrow_upward' : 'arrow_downward'" aria-hidden="true"></i></button><select v-model="density" aria-label="Row density"><option value="comfortable">{{ $t('organizer.comfortable') }}</option><option value="compact">{{ $t('organizer.compact') }}</option></select><button v-if="tab === 'files'" :class="{ pinned: split }" :aria-pressed="split" title="Destination pane" aria-label="Toggle destination pane" @click="toggleSplit"><i class="material-symbols">view_column</i></button></div>
-          <section v-if="showFilters && tab === 'files'" class="filter-panel" :aria-label="$t('organizer.moreFilters')"><div><label>{{ $t('organizer.minimumSizeMb') }}<input v-model="minSize" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0"/></label><label>{{ $t('organizer.maximumSizeMb') }}<input v-model="maxSize" type="number" min="0" step="0.1" inputmode="decimal" placeholder="Any"/></label><label>{{ $t('organizer.modifiedAfter') }}<input v-model="modifiedAfter" type="date" :max="modifiedBefore || undefined"/></label><label>{{ $t('organizer.modifiedBefore') }}<input v-model="modifiedBefore" type="date" :min="modifiedAfter || undefined"/></label><button v-if="activeFilterCount" class="clear-filters" @click="clearFilters">{{ $t('organizer.clearFilters') }}</button></div><p>{{ $t('organizer.foldersRemainVisible') }}</p></section>
-          <div v-if="tab === 'library'" class="index-status"><i class="material-symbols">info</i><span v-if="scan">{{ $t('organizer.index') }}{{ scan.status }}{{ $t('organizer.separator3') }}{{ scan.processed || 0 }}{{ $t('organizer.filesProcessed') }}<span v-if="scan.errors">{{ $t('organizer.separator3') }}{{ scan.errors }}{{ $t('organizer.issues') }}</span>{{ $t('organizer.separator4') }}<span v-if="scan.error">{{ scan.error }}</span></span><span v-else>{{ $t('organizer.indexAFolderToSearchItsSubfoldersCompareContentAnd') }}</span><button v-if="duplicates.length" @click="showDuplicates = !showDuplicates">{{ duplicates.length }}{{ $t('organizer.duplicateGroups') }}<i class="material-symbols" :textContent="showDuplicates ? 'expand_less' : 'expand_more'" aria-hidden="true"></i></button></div>
-          <section v-if="showDuplicates && tab === 'library'" class="duplicates-panel" aria-label="Content duplicates"><div class="section-heading"><h2>{{ $t('organizer.sameContentYourChoice') }}</h2><span>{{ $t('organizer.sha256VerifiedAtIndexingCheckedAgainBeforeOperations') }}</span></div><article v-for="group in duplicates" :key="group.sha256" class="duplicate-group"><div class="duplicate-summary"><i class="material-symbols">content_copy</i><strong>{{ group.files.length }}{{ $t('organizer.identicalFiles') }}</strong><span>{{ formatBytes(group.size) }}{{ $t('organizer.each') }}</span><button @click="selectDuplicates(group)">{{ $t('organizer.selectOtherCopies') }}</button></div><label v-for="file in group.files" :key="itemKey(file)" class="duplicate-file"><input type="radio" :name="group.sha256" :checked="(keepers[group.sha256] || itemKey(group.files[0])) === itemKey(file)" @change="chooseKeeper(group, file)"/><span class="keeper-label">{{ $t('organizer.keep') }}</span><span>{{ file.source }}{{ $t('organizer.separator3') }}{{ file.path }}</span></label></article></section>
+          <div class="location-bar"><select v-model="source" aria-label="Storage source" @change="changeSource"><option v-for="name in sources" :key="name" :value="name">{{ name }}</option></select><span class="location-divider">{{ $t('organizer.separator2') }}</span><form class="address-form" @submit.prevent="navigate(source, address)"><input ref="addressInput" v-model="address" aria-label="Folder path" title="Folder path · Ctrl+L"/><button type="submit" title="Go to folder" aria-label="Go to folder"><i class="material-symbols">arrow_forward</i></button></form><button type="button" :class="{ pinned: isPinned }" :aria-pressed="isPinned" :title="isPinned ? 'Unpin folder' : 'Pin folder'" aria-label="Toggle favorite" @click="toggleFavorite"><i class="material-symbols" :textContent="isPinned ? 'star' : 'star_border'" aria-hidden="true"></i></button><button type="button" title="Parent folder" aria-label="Parent folder" :disabled="path === '/'" @click="navigate(source, getParentDir(path))"><i class="material-symbols">arrow_upward</i></button><button type="button" title="Refresh" aria-label="Refresh" :disabled="busy" @click="refresh(true)"><i class="material-symbols">refresh</i></button></div>
+          <div class="browser-tools">
+            <label class="filter-input">
+              <i class="material-symbols" aria-hidden="true">search</i>
+              <input
+                v-model="query"
+                :placeholder="tab === 'library' ? 'Search names, paths, tags…' : 'Find in this folder…'"
+                :aria-label="tab === 'library' ? 'Search indexed library' : 'Filter this folder'"
+              />
+              <kbd :textContent="'/'"></kbd>
+            </label>
+            <div class="browser-filter-controls" role="group" aria-label="Filters">
+              <select v-if="tab === 'files'" v-model="category" aria-label="Filter by type">
+                <option value="">{{ $t('organizer.allTypes') }}</option>
+                <option value="directory">{{ $t('organizer.folders') }}</option>
+                <option value="image">{{ $t('organizer.images') }}</option>
+                <option value="video">{{ $t('organizer.video') }}</option>
+                <option value="audio">{{ $t('organizer.audio') }}</option>
+                <option value="text">{{ $t('organizer.text') }}</option>
+                <option value="application">{{ $t('organizer.documentsOther') }}</option>
+              </select>
+              <button
+                type="button"
+                v-if="tab === 'files'"
+                class="filter-toggle"
+                :class="{ active: showFilters }"
+                :aria-expanded="showFilters"
+                @click="showFilters = !showFilters"
+              >
+                <i class="material-symbols" aria-hidden="true">tune</i>
+                {{ $t('organizer.moreFilters') }}
+                <span v-if="activeFilterCount" class="filter-count">{{ activeFilterCount }}</span>
+              </button>
+            </div>
+            <div class="browser-view-controls" role="group" :aria-label="$t('organizer.sortBy')">
+              <select v-model="sort" :aria-label="$t('organizer.sortBy')">
+                <option value="name">{{ $t('organizer.name') }}</option>
+                <option value="modified">{{ $t('organizer.modifiedDate') }}</option>
+                <option value="size">{{ $t('organizer.fileSize') }}</option>
+                <option value="type">{{ $t('organizer.type') }}</option>
+                <template v-if="tab === 'library'">
+                  <option value="capturedAt">{{ $t('organizer.captureDate') }}</option>
+                  <option value="width">{{ $t('organizer.width') }}</option>
+                  <option value="height">{{ $t('organizer.height') }}</option>
+                  <option value="duration">{{ $t('organizer.duration') }}</option>
+                  <option value="artist">{{ $t('organizer.artist') }}</option>
+                  <option value="album">{{ $t('organizer.album') }}</option>
+                  <option value="title">{{ $t('organizer.title') }}</option>
+                  <option value="tags">{{ $t('organizer.tags') }}</option>
+                </template>
+                <option v-else value="extension">{{ $t('organizer.extension') }}</option>
+              </select>
+              <button
+                type="button"
+                :aria-label="direction === 'asc' ? 'Sort descending' : 'Sort ascending'"
+                :title="direction === 'asc' ? 'Sort descending' : 'Sort ascending'"
+                @click="direction = direction === 'asc' ? 'desc' : 'asc'"
+              >
+                <i class="material-symbols" :textContent="direction === 'asc' ? 'arrow_upward' : 'arrow_downward'" aria-hidden="true"></i>
+              </button>
+              <select v-model="density" aria-label="Row density">
+                <option value="comfortable">{{ $t('organizer.comfortable') }}</option>
+                <option value="compact">{{ $t('organizer.compact') }}</option>
+              </select>
+              <button
+                type="button"
+                v-if="tab === 'files'"
+                :class="{ pinned: split }"
+                :aria-pressed="split"
+                title="Destination pane"
+                aria-label="Toggle destination pane"
+                @click="toggleSplit"
+              >
+                <i class="material-symbols" aria-hidden="true">view_column</i>
+              </button>
+            </div>
+          </div>
+          <section v-if="showFilters && tab === 'files'" class="filter-panel" :aria-label="$t('organizer.moreFilters')"><div><label>{{ $t('organizer.minimumSizeMb') }}<input v-model="minSize" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0"/></label><label>{{ $t('organizer.maximumSizeMb') }}<input v-model="maxSize" type="number" min="0" step="0.1" inputmode="decimal" placeholder="Any"/></label><label>{{ $t('organizer.modifiedAfter') }}<input v-model="modifiedAfter" type="date" :max="modifiedBefore || undefined"/></label><label>{{ $t('organizer.modifiedBefore') }}<input v-model="modifiedBefore" type="date" :min="modifiedAfter || undefined"/></label><button v-if="activeFilterCount" type="button" class="clear-filters" @click="clearFilters">{{ $t('organizer.clearFilters') }}</button></div><p>{{ $t('organizer.foldersRemainVisible') }}</p></section>
+          <div v-if="tab === 'library'" class="index-status" role="status" aria-live="polite">
+            <i class="material-symbols" :textContent="['queued', 'running'].includes(scan?.status) ? 'sync' : 'info'" aria-hidden="true"></i>
+            <div class="index-details">
+              <strong v-if="scan" class="scan-state" :class="`scan-state--${scan.status}`">{{ $t('organizer.index') }}{{ scan.status }}</strong>
+              <span class="scan-scope">{{ scan?.source || source }}{{ $t('organizer.separator3') }}{{ scan?.path || path }}</span>
+              <span v-if="scan">{{ scan.processed || 0 }}{{ $t('organizer.filesProcessed') }}<template v-if="scan.errors">{{ $t('organizer.separator3') }}{{ scan.errors }}{{ $t('organizer.issues') }}</template></span>
+              <span v-else>{{ $t('organizer.indexAFolderToSearchItsSubfoldersCompareContentAnd') }}</span>
+              <span v-if="scan?.error" class="scan-error">{{ $t('organizer.separator4') }}{{ scan.error }}</span>
+            </div>
+            <button
+              type="button"
+              v-if="duplicates.length"
+              class="duplicate-toggle"
+              :aria-expanded="showDuplicates"
+              aria-controls="workspace-duplicate-review"
+              @click="showDuplicates = !showDuplicates"
+            >
+              {{ duplicates.length }}{{ $t('organizer.duplicateGroups') }}
+              <i class="material-symbols" :textContent="showDuplicates ? 'expand_less' : 'expand_more'" aria-hidden="true"></i>
+            </button>
+          </div>
+          <section
+            v-if="tab === 'library' && duplicates.length"
+            v-show="showDuplicates"
+            id="workspace-duplicate-review"
+            class="duplicates-panel"
+            aria-label="Content duplicates"
+          >
+            <div class="section-heading">
+              <h2>{{ $t('organizer.sameContentYourChoice') }}</h2>
+              <span>{{ $t('organizer.sha256VerifiedAtIndexingCheckedAgainBeforeOperations') }}</span>
+            </div>
+            <article v-for="group in duplicates" :key="group.sha256" class="duplicate-group">
+              <div class="duplicate-summary">
+                <i class="material-symbols" aria-hidden="true">content_copy</i>
+                <strong>{{ group.files.length }}{{ $t('organizer.identicalFiles') }}</strong>
+                <span>{{ formatBytes(group.size) }}{{ $t('organizer.each') }}</span>
+                <button type="button" class="select-other-copies" @click="selectDuplicates(group)">{{ $t('organizer.selectOtherCopies') }}</button>
+              </div>
+              <label
+                v-for="file in group.files"
+                :key="itemKey(file)"
+                class="duplicate-file"
+                :class="{ 'is-keeper': (keepers[group.sha256] || itemKey(group.files[0])) === itemKey(file) }"
+              >
+                <input
+                  type="radio"
+                  :name="group.sha256"
+                  :checked="(keepers[group.sha256] || itemKey(group.files[0])) === itemKey(file)"
+                  :aria-label="`${$t('organizer.keep')}: ${file.source} ${file.path}`"
+                  @change="chooseKeeper(group, file)"
+                />
+                <span class="keeper-label">{{ (keepers[group.sha256] || itemKey(group.files[0])) === itemKey(file) ? $t('organizer.keep') : '' }}</span>
+                <span class="duplicate-path">{{ file.source }}{{ $t('organizer.separator3') }}{{ file.path }}</span>
+              </label>
+            </article>
+          </section>
           <div class="browser-layout" :class="{ 'with-side': split || preview }">
-            <section class="file-surface" aria-label="Files"><div class="list-caption"><span>{{ tab === 'library' ? total : displayed.length }} {{ tab === 'library' ? $t('organizer.indexedItems') : $t('organizer.items') }}<span v-if="query && tab === 'files'">{{ $t('organizer.of') }}{{ files.length }}</span></span><span>{{ selection.size ? `${selection.size} selected` : $t('organizer.spaceToPreviewShiftToSelectARange') }}</span></div><div class="table-heading"><input type="checkbox" :checked="allSelected" :indeterminate="selection.size > 0 && !allSelected" :disabled="!displayed.length" aria-label="Select all visible results" @change="selectAll"/><button class="sort-heading" @click="setSort('name')">{{ $t('organizer.name') }}<i v-if="sort === 'name'" class="material-symbols">{{ direction === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</i></button><button class="sort-heading" @click="setSort('modified')">{{ $t('organizer.modified') }}<i v-if="sort === 'modified'" class="material-symbols">{{ direction === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</i></button><button class="sort-heading" @click="setSort('size')">{{ $t('organizer.size') }}<i v-if="sort === 'size'" class="material-symbols">{{ direction === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</i></button><button class="sort-heading" @click="setSort(tab === 'library' && !['name','modified','size','type'].includes(sort) ? sort : 'type')">{{ tab === 'library' && !['name','modified','size','type'].includes(sort) ? sortLabel : $t('organizer.type') }}<i v-if="sort === 'type' || (tab === 'library' && !['name','modified','size','type'].includes(sort))" class="material-symbols">{{ direction === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</i></button></div>
-              <div ref="listElement" class="virtual-list" role="listbox" aria-label="File list" aria-multiselectable="true" tabindex="0" :aria-activedescendant="focused >= 0 ? `organizer-row-${focused}` : undefined" @scroll="onScroll" @keydown="listKeys"><div :style="{ height: `${windowRows.before}px` }"></div><div v-for="(file, offset) in rendered" :id="`organizer-row-${windowRows.start + offset}`" :key="itemKey(file)" class="file-row" :class="{ selected: selection.has(itemKey(file)), focused: focused === windowRows.start + offset }" :style="{ height: `${rowHeight}px` }" role="option" :aria-selected="selection.has(itemKey(file))" @click="selectFile(file, windowRows.start + offset, $event)" @dblclick="openFile(file)"><input type="checkbox" :checked="selection.has(itemKey(file))" :aria-label="`Select ${file.name}`" tabindex="-1" @click.stop="selectFile(file, windowRows.start + offset, { ctrlKey: true, shiftKey: $event.shiftKey })"/><span class="file-name"><span class="file-icon" :class="fileKind(file)"><i class="material-symbols">{{ fileIcon(file) }}</i></span><span class="name-lines"><strong>{{ file.name }}</strong><small v-if="tab === 'library'">{{ file.path }}</small><small v-if="tab === 'library' && !['name','modified','size','type'].includes(sort)" class="metadata-line">{{ sortLabel }}{{ $t('organizer.separator5') }}{{ lastColumn(file) }}</small></span></span><span class="file-date">{{ formatDate(file.modified) }}</span><span class="file-size">{{ isFolder(file) ? $t('organizer.separator6') : formatBytes(file.size) }}</span><span class="file-type">{{ lastColumn(file) }}</span></div><div :style="{ height: `${windowRows.after}px` }"></div><div v-if="busy && !displayed.length" class="empty-state"><span class="loading-ring"></span><h2>{{ $t('organizer.makingRoom') }}</h2><p>{{ $t('organizer.loadingYourFiles') }}</p></div><div v-else-if="!displayed.length" class="empty-state"><i class="material-symbols" :textContent="query ? 'search' : 'folder_open'" aria-hidden="true"></i><h2>{{ query ? $t('organizer.nothingMatchesJustYet') : $t('organizer.aClearSpace') }}</h2><p>{{ query ? $t('organizer.tryAnotherNameOrADifferentType') : tab === 'library' ? $t('organizer.indexThisLocationToExploreItsLibrary') : $t('organizer.yourFilesWillAppearHereUploadSomethingToBegin') }}</p></div></div>
-              <div v-if="tab === 'library' && total > pageSize" class="pagination"><button :disabled="offset === 0 || busy" @click="offset = Math.max(0, offset - pageSize)">{{ $t('organizer.previous') }}</button><span>{{ offset + 1 }}{{ $t('organizer.separator7') }}{{ Math.min(offset + pageSize, total) }}{{ $t('organizer.of') }}{{ total }}</span><button :disabled="offset + pageSize >= total || busy" @click="offset += pageSize">{{ $t('organizer.next') }}</button></div>
+            <section class="file-surface" aria-label="Files"><div class="list-caption"><span>{{ tab === 'library' ? total : displayed.length }} {{ tab === 'library' ? $t('organizer.indexedItems') : $t('organizer.items') }}<span v-if="query && tab === 'files'">{{ $t('organizer.of') }}{{ files.length }}</span></span><span>{{ selection.size ? `${selection.size} selected` : $t('organizer.spaceToPreviewShiftToSelectARange') }}</span></div><div class="table-heading"><input type="checkbox" :checked="allSelected" :indeterminate="selection.size > 0 && !allSelected" :disabled="!displayed.length" aria-label="Select all visible results" @change="selectAll"/><button type="button" class="sort-heading" @click="setSort('name')">{{ $t('organizer.name') }}<i v-if="sort === 'name'" class="material-symbols" :textContent="direction === 'asc' ? 'arrow_upward' : 'arrow_downward'" aria-hidden="true"></i></button><button type="button" class="sort-heading" @click="setSort('modified')">{{ $t('organizer.modified') }}<i v-if="sort === 'modified'" class="material-symbols" :textContent="direction === 'asc' ? 'arrow_upward' : 'arrow_downward'" aria-hidden="true"></i></button><button type="button" class="sort-heading" @click="setSort('size')">{{ $t('organizer.size') }}<i v-if="sort === 'size'" class="material-symbols" :textContent="direction === 'asc' ? 'arrow_upward' : 'arrow_downward'" aria-hidden="true"></i></button><button type="button" class="sort-heading" @click="setSort(tab === 'library' && !['name','modified','size','type'].includes(sort) ? sort : 'type')">{{ tab === 'library' && !['name','modified','size','type'].includes(sort) ? sortLabel : $t('organizer.type') }}<i v-if="sort === 'type' || (tab === 'library' && !['name','modified','size','type'].includes(sort))" class="material-symbols" :textContent="direction === 'asc' ? 'arrow_upward' : 'arrow_downward'" aria-hidden="true"></i></button></div>
+              <div ref="listElement" class="virtual-list" role="listbox" aria-label="File list" aria-multiselectable="true" tabindex="0" :aria-activedescendant="focused >= 0 ? `organizer-row-${focused}` : undefined" @scroll="onScroll" @keydown="listKeys"><div :style="{ height: `${windowRows.before}px` }"></div><div v-for="(file, offset) in rendered" :id="`organizer-row-${windowRows.start + offset}`" :key="itemKey(file)" class="file-row" :class="{ selected: selection.has(itemKey(file)), focused: focused === windowRows.start + offset }" :style="{ height: `${rowHeight}px` }" role="option" tabindex="-1" :aria-selected="selection.has(itemKey(file))" @click="selectFile(file, windowRows.start + offset, $event)" @dblclick="openFile(file)"><input type="checkbox" :checked="selection.has(itemKey(file))" :aria-label="`Select ${file.name}`" tabindex="-1" @click.stop="selectFile(file, windowRows.start + offset, { ctrlKey: true, shiftKey: $event.shiftKey })"/><span class="file-name"><span class="file-icon" :class="fileKind(file)"><i class="material-symbols">{{ fileIcon(file) }}</i></span><span class="name-lines"><strong>{{ file.name }}</strong><small v-if="tab === 'library'">{{ file.path }}</small><small v-if="tab === 'library' && !['name','modified','size','type'].includes(sort)" class="metadata-line">{{ sortLabel }}{{ $t('organizer.separator5') }}{{ lastColumn(file) }}</small></span></span><span class="file-date">{{ formatDate(file.modified) }}</span><span class="file-size">{{ isFolder(file) ? $t('organizer.separator6') : formatBytes(file.size) }}</span><span class="file-type">{{ lastColumn(file) }}</span></div><div :style="{ height: `${windowRows.after}px` }"></div><div v-if="busy && !displayed.length" class="empty-state"><span class="loading-ring"></span><h2>{{ $t('organizer.makingRoom') }}</h2><p>{{ $t('organizer.loadingYourFiles') }}</p></div><div v-else-if="!displayed.length" class="empty-state"><i class="material-symbols" :textContent="query ? 'search' : 'folder_open'" aria-hidden="true"></i><h2>{{ query ? $t('organizer.nothingMatchesJustYet') : $t('organizer.aClearSpace') }}</h2><p>{{ query ? $t('organizer.tryAnotherNameOrADifferentType') : tab === 'library' ? $t('organizer.indexThisLocationToExploreItsLibrary') : $t('organizer.yourFilesWillAppearHereUploadSomethingToBegin') }}</p></div></div>
+              <div v-if="tab === 'library' && total > pageSize" class="pagination"><button type="button" :disabled="offset === 0 || busy" @click="offset = Math.max(0, offset - pageSize)">{{ $t('organizer.previous') }}</button><span>{{ offset + 1 }}{{ $t('organizer.separator7') }}{{ Math.min(offset + pageSize, total) }}{{ $t('organizer.of') }}{{ total }}</span><button type="button" :disabled="offset + pageSize >= total || busy" @click="offset += pageSize">{{ $t('organizer.next') }}</button></div>
             </section>
-            <aside v-if="preview" class="detail-panel" aria-label="Quick preview"><div class="panel-heading"><span>{{ $t('organizer.quickLook') }}</span><button aria-label="Close preview" @click="closePreview"><i class="material-symbols">close</i></button></div><img v-if="previewImage" class="preview-image" :src="previewImage" :alt="preview.name"/><video v-else-if="previewURL && preview.type?.startsWith('video')" class="preview-media" :src="previewURL" controls preload="none" :aria-label="preview.name"></video><audio v-else-if="previewURL && preview.type?.startsWith('audio')" class="preview-media" :src="previewURL" controls preload="none" :aria-label="preview.name"></audio><iframe v-else-if="previewURL && preview.type === 'application/pdf'" class="preview-pdf" :src="previewURL" :title="preview.name"></iframe><div v-else-if="previewText !== ''" class="preview-text-wrap"><pre class="preview-text">{{ previewText }}</pre><p v-if="previewTruncated" class="preview-hint">{{ $t('organizer.first64KbShownOpenTheFullViewerForMore') }}</p></div><div v-else class="preview-placeholder"><i class="material-symbols">{{ fileIcon(preview) }}</i><span>{{ previewLoading ? $t('organizer.loadingPreview') : $t('organizer.openTheFullViewerForThisFormat') }}</span></div><p v-if="previewError" class="preview-hint" role="status">{{ previewError }}</p><h2>{{ preview.name }}</h2><p class="detail-path">{{ preview.source }}{{ $t('organizer.separator3') }}{{ preview.path }}</p><dl><dt>{{ $t('organizer.size') }}</dt><dd>{{ isFolder(preview) ? $t('organizer.folder') : formatBytes(preview.size) }}</dd><dt>{{ $t('organizer.modified') }}</dt><dd>{{ formatDate(preview.modified, true) }}</dd><template v-for="(value, field) in preview.metadata || {}" :key="field"><dt>{{ field }}</dt><dd>{{ value ?? '—' }}</dd></template></dl><button class="primary full-width" @click="openFile(preview)"><i class="material-symbols">open_in_new</i>{{ isFolder(preview) ? $t('organizer.openFolder') : $t('organizer.openFullViewer') }}</button><form v-if="tab === 'library' && canTag" class="tag-form" @submit.prevent="saveTags"><label for="workspace-tags">{{ $t('organizer.tags2') }}<small>{{ $t('organizer.separatedByCommas') }}</small></label><input id="workspace-tags" v-model="tagInput" placeholder="e.g. family, to organize"/><button :disabled="busy">{{ $t('organizer.saveTags') }}</button></form></aside>
-            <aside v-else-if="split" class="detail-panel destination-pane" aria-label="Destination folder"><div class="panel-heading"><span>{{ $t('organizer.destination') }}</span><button aria-label="Close destination pane" @click="split = false"><i class="material-symbols">close</i></button></div><p>{{ $t('organizer.browseASecondFolderThenMoveOrCopyYourSelection') }}</p><select v-model="destination.source" aria-label="Destination source" @change="loadDestination('/')"><option v-for="name in sources" :key="name">{{ name }}</option></select><form @submit.prevent="loadDestination(destination.path)"><input v-model="destination.path" aria-label="Destination path"/><button type="submit" aria-label="Browse destination"><i class="material-symbols">arrow_forward</i></button></form><button :disabled="destination.path === '/'" @click="loadDestination(getParentDir(destination.path))"><i class="material-symbols">arrow_upward</i>{{ $t('organizer.parentFolder') }}</button><button v-for="folder in destinationFolders" :key="folder.path" class="destination-folder" @click="loadDestination(folder.path)"><i class="material-symbols">folder</i>{{ folder.name }}<i class="material-symbols">chevron_right</i></button><p v-if="!destinationFolders.length">{{ $t('organizer.noSubfolders') }}</p><div class="destination-actions"><button :disabled="!selection.size || !canMoveHere" @click="confirmOperation('move')">{{ $t('organizer.moveHere') }}</button><button :disabled="!selection.size || !canCopyHere" @click="confirmOperation('copy')">{{ $t('organizer.copyHere') }}</button></div></aside>
+            <aside v-if="preview" class="detail-panel" aria-label="Quick preview"><div class="panel-heading"><span>{{ $t('organizer.quickLook') }}</span><button type="button" aria-label="Close preview" @click="closePreview"><i class="material-symbols">close</i></button></div><img v-if="previewImage" class="preview-image" :src="previewImage" :alt="preview.name"/><video v-else-if="previewURL && preview.type?.startsWith('video')" class="preview-media" :src="previewURL" controls preload="none" :aria-label="preview.name"></video><audio v-else-if="previewURL && preview.type?.startsWith('audio')" class="preview-media" :src="previewURL" controls preload="none" :aria-label="preview.name"></audio><iframe v-else-if="previewURL && preview.type === 'application/pdf'" class="preview-pdf" :src="previewURL" :title="preview.name"></iframe><div v-else-if="previewText !== ''" class="preview-text-wrap"><pre class="preview-text">{{ previewText }}</pre><p v-if="previewTruncated" class="preview-hint">{{ $t('organizer.first64KbShownOpenTheFullViewerForMore') }}</p></div><div v-else class="preview-placeholder"><i class="material-symbols">{{ fileIcon(preview) }}</i><span>{{ previewLoading ? $t('organizer.loadingPreview') : $t('organizer.openTheFullViewerForThisFormat') }}</span></div><p v-if="previewError" class="preview-hint" role="status">{{ previewError }}</p><h2>{{ preview.name }}</h2><p class="detail-path">{{ preview.source }}{{ $t('organizer.separator3') }}{{ preview.path }}</p><dl><dt>{{ $t('organizer.size') }}</dt><dd>{{ isFolder(preview) ? $t('organizer.folder') : formatBytes(preview.size) }}</dd><dt>{{ $t('organizer.modified') }}</dt><dd>{{ formatDate(preview.modified, true) }}</dd><template v-for="(value, field) in preview.metadata || {}" :key="field"><dt>{{ field }}</dt><dd>{{ value ?? '—' }}</dd></template></dl><button type="button" class="primary full-width" @click="openFile(preview)"><i class="material-symbols">open_in_new</i>{{ isFolder(preview) ? $t('organizer.openFolder') : $t('organizer.openFullViewer') }}</button><form v-if="tab === 'library' && canTag" class="tag-form" @submit.prevent="saveTags"><label for="workspace-tags">{{ $t('organizer.tags2') }}<small>{{ $t('organizer.separatedByCommas') }}</small></label><input id="workspace-tags" v-model="tagInput" placeholder="e.g. family, to organize"/><button type="submit" :disabled="busy">{{ $t('organizer.saveTags') }}</button></form></aside>
+            <aside v-else-if="split" class="detail-panel destination-pane" aria-label="Destination folder"><div class="panel-heading"><span>{{ $t('organizer.destination') }}</span><button type="button" aria-label="Close destination pane" @click="split = false"><i class="material-symbols">close</i></button></div><p>{{ $t('organizer.browseASecondFolderThenMoveOrCopyYourSelection') }}</p><select v-model="destination.source" aria-label="Destination source" @change="loadDestination('/')"><option v-for="name in sources" :key="name">{{ name }}</option></select><form @submit.prevent="loadDestination(destination.path)"><input v-model="destination.path" aria-label="Destination path"/><button type="submit" aria-label="Browse destination"><i class="material-symbols">arrow_forward</i></button></form><button type="button" :disabled="destination.path === '/'" @click="loadDestination(getParentDir(destination.path))"><i class="material-symbols">arrow_upward</i>{{ $t('organizer.parentFolder') }}</button><button type="button" v-for="folder in destinationFolders" :key="folder.path" class="destination-folder" @click="loadDestination(folder.path)"><i class="material-symbols">folder</i>{{ folder.name }}<i class="material-symbols">chevron_right</i></button><p v-if="!destinationFolders.length">{{ $t('organizer.noSubfolders') }}</p><div class="destination-actions"><button type="button" :disabled="!selection.size || !canMoveHere" @click="confirmOperation('move')">{{ $t('organizer.moveHere') }}</button><button type="button" :disabled="!selection.size || !canCopyHere" @click="confirmOperation('copy')">{{ $t('organizer.copyHere') }}</button></div></aside>
           </div>
         </template>
 
-        <section v-else-if="tab === 'activity'" class="activity-list" aria-label="Background jobs"><div class="section-heading"><h2>{{ $t('organizer.everyOperationAccountedFor') }}</h2><button @click="refresh()"><i class="material-symbols">refresh</i>{{ $t('organizer.refresh') }}</button></div><p class="section-note">{{ $t('organizer.movesCopiesAndTrashOperationsContinueOnTheServerWhen') }}</p><article v-for="job in jobs" :key="job.id" class="job-card"><div class="job-heading"><span class="job-symbol"><i class="material-symbols" :textContent="job.kind === 'trash' ? 'delete' : job.kind === 'copy' ? 'content_copy' : 'drive_file_move'" aria-hidden="true"></i></span><div><h3>{{ job.kind }} <span>{{ $t('organizer.separator8') }}{{ job.total }}{{ $t('organizer.items2') }}</span></h3><p>{{ formatDate(job.createdAt, true) }}</p></div><span class="status-pill" :class="job.status">{{ job.status }}</span></div><progress :value="job.completed + job.failed" :max="job.total || 1" :aria-label="`${job.kind} progress`"></progress><div class="job-footer"><span>{{ job.completed }}{{ $t('organizer.completed') }}<span v-if="job.failed">{{ $t('organizer.separator3') }}{{ job.failed }}{{ $t('organizer.failed') }}</span></span><button v-if="['queued','running'].includes(job.status)" @click="jobAction(job, 'cancel')">{{ $t('organizer.stopPending') }}</button><button v-if="job.failed > 0" @click="jobAction(job, 'retry')">{{ $t('organizer.retryFailedItems') }}</button></div><details v-if="job.items?.some(item => item.error)"><summary>{{ $t('organizer.reviewFailures') }}</summary><p v-for="item in job.items.filter(item => item.error)" :key="itemKey(item)" class="failure-line">{{ item.path }}{{ $t('organizer.separator5') }}{{ item.error }}</p></details></article><div v-if="!jobs.length && !busy" class="empty-state"><i class="material-symbols">check_circle</i><h2>{{ $t('organizer.allQuietHere') }}</h2><p>{{ $t('organizer.yourOrganizingActivityWillAppearHere') }}</p></div></section>
-        <section v-else class="trash-list" aria-label="Recoverable trash"><div class="section-heading"><h2>{{ $t('organizer.aSecondChanceForYourFiles') }}</h2><button @click="refresh()"><i class="material-symbols">refresh</i>{{ $t('organizer.refresh') }}</button></div><p class="section-note">{{ $t('organizer.trashedItemsAreRetainedInPrivateRecoverableStorageUntilYou') }}</p><article v-for="item in trash" :key="item.id" class="trash-row"><span class="file-icon"><i class="material-symbols">{{ fileIcon(item) }}</i></span><div><strong>{{ item.name }}</strong><small>{{ item.source }}{{ $t('organizer.separator3') }}{{ item.path }}</small><small v-if="item.status !== 'ready'" class="trash-review">{{ $t('organizer.needsReviewRecoveryIsIncompleteRestoreIsDisabledToProtect') }}</small></div><span>{{ formatDate(item.deletedAt) }}</span><button :disabled="busy || item.status !== 'ready' || !sourcePermission(item.source, 'create')" @click="confirmRestore(item)"><i class="material-symbols">restore</i>{{ $t('organizer.restore') }}</button></article><div v-if="!trash.length && !busy" class="empty-state"><i class="material-symbols">delete</i><h2>{{ $t('organizer.nothingLeftBehind') }}</h2><p>{{ $t('organizer.filesYouMoveToTrashWillBeRecoverableHere') }}</p></div></section>
+        <section v-else-if="tab === 'activity'" class="activity-list" aria-label="Background jobs"><div class="section-heading"><h2>{{ $t('organizer.everyOperationAccountedFor') }}</h2><button type="button" @click="refresh()"><i class="material-symbols">refresh</i>{{ $t('organizer.refresh') }}</button></div><p class="section-note">{{ $t('organizer.movesCopiesAndTrashOperationsContinueOnTheServerWhen') }}</p><article v-for="job in jobs" :key="job.id" class="job-card"><div class="job-heading"><span class="job-symbol"><i class="material-symbols" :textContent="job.kind === 'trash' ? 'delete' : job.kind === 'copy' ? 'content_copy' : 'drive_file_move'" aria-hidden="true"></i></span><div><h3>{{ job.kind }} <span>{{ $t('organizer.separator8') }}{{ job.total }}{{ $t('organizer.items2') }}</span></h3><p>{{ formatDate(job.createdAt, true) }}</p></div><span class="status-pill" :class="job.status">{{ job.status }}</span></div><progress :value="job.completed + job.failed" :max="job.total || 1" :aria-label="`${job.kind} progress`"></progress><div class="job-footer"><span>{{ job.completed }}{{ $t('organizer.completed') }}<span v-if="job.failed">{{ $t('organizer.separator3') }}{{ job.failed }}{{ $t('organizer.failed') }}</span></span><button type="button" v-if="['queued','running'].includes(job.status)" @click="jobAction(job, 'cancel')">{{ $t('organizer.stopPending') }}</button><button type="button" v-if="job.failed > 0" @click="jobAction(job, 'retry')">{{ $t('organizer.retryFailedItems') }}</button></div><details v-if="job.items?.some(item => item.error)"><summary>{{ $t('organizer.reviewFailures') }}</summary><p v-for="item in job.items.filter(item => item.error)" :key="itemKey(item)" class="failure-line">{{ item.path }}{{ $t('organizer.separator5') }}{{ item.error }}</p></details></article><div v-if="!jobs.length && !busy" class="empty-state"><i class="material-symbols">check_circle</i><h2>{{ $t('organizer.allQuietHere') }}</h2><p>{{ $t('organizer.yourOrganizingActivityWillAppearHere') }}</p></div></section>
+        <section v-else class="trash-list" aria-label="Recoverable trash"><div class="section-heading"><h2>{{ $t('organizer.aSecondChanceForYourFiles') }}</h2><button type="button" @click="refresh()"><i class="material-symbols">refresh</i>{{ $t('organizer.refresh') }}</button></div><p class="section-note">{{ $t('organizer.trashedItemsAreRetainedInPrivateRecoverableStorageUntilYou') }}</p><article v-for="item in trash" :key="item.id" class="trash-row"><span class="file-icon"><i class="material-symbols">{{ fileIcon(item) }}</i></span><div><strong>{{ item.name }}</strong><small>{{ item.source }}{{ $t('organizer.separator3') }}{{ item.path }}</small><small v-if="item.status !== 'ready'" class="trash-review">{{ $t('organizer.needsReviewRecoveryIsIncompleteRestoreIsDisabledToProtect') }}</small></div><span>{{ formatDate(item.deletedAt) }}</span><button type="button" :disabled="busy || item.status !== 'ready' || !sourcePermission(item.source, 'create')" @click="confirmRestore(item)"><i class="material-symbols">restore</i>{{ $t('organizer.restore') }}</button></article><div v-if="!trash.length && !busy" class="empty-state"><i class="material-symbols">delete</i><h2>{{ $t('organizer.nothingLeftBehind') }}</h2><p>{{ $t('organizer.filesYouMoveToTrashWillBeRecoverableHere') }}</p></div></section>
       </section>
-      <div v-if="selection.size && ['files','library'].includes(tab)" class="selection-bar" role="region" aria-label="Selection actions"><button class="clear-selection" aria-label="Clear selection" @click="clearSelection"><i class="material-symbols">close</i></button><strong>{{ selection.size }}{{ $t('organizer.selected') }}</strong><button v-if="selection.size === 1" title="Quick preview" aria-label="Quick preview selected file" @click="showPreview(selectedFiles[0])"><i class="material-symbols">visibility</i></button><span class="selection-divider"></span><button :disabled="!canMove" @click="beginOperation('move')"><i class="material-symbols">drive_file_move</i>{{ $t('organizer.move') }}</button><button :disabled="!canCopy" @click="beginOperation('copy')"><i class="material-symbols">content_copy</i>{{ $t('organizer.copy') }}</button><button :disabled="!canDownload" @click="downloadSelection"><i class="material-symbols">download</i>{{ $t('organizer.download') }}</button><button :disabled="!canDelete" @click="confirmOperation('trash')"><i class="material-symbols">delete</i>{{ $t('organizer.trash') }}</button></div>
+      <div v-if="selection.size && ['files','library'].includes(tab)" class="selection-bar" role="region" aria-label="Selection actions"><button type="button" class="clear-selection" aria-label="Clear selection" @click="clearSelection"><i class="material-symbols">close</i></button><strong>{{ selection.size }}{{ $t('organizer.selected') }}</strong><button type="button" v-if="selection.size === 1" title="Quick preview" aria-label="Quick preview selected file" @click="showPreview(selectedFiles[0])"><i class="material-symbols">visibility</i></button><span class="selection-divider"></span><button type="button" :disabled="!canMove" @click="beginOperation('move')"><i class="material-symbols">drive_file_move</i>{{ $t('organizer.move') }}</button><button type="button" :disabled="!canCopy" @click="beginOperation('copy')"><i class="material-symbols">content_copy</i>{{ $t('organizer.copy') }}</button><button type="button" :disabled="!canDownload" @click="downloadSelection"><i class="material-symbols">download</i>{{ $t('organizer.download') }}</button><button type="button" :disabled="!canDelete" @click="confirmOperation('trash')"><i class="material-symbols">delete</i>{{ $t('organizer.trash') }}</button></div>
     </main>
     <dialog ref="operationDialog" class="operation-dialog" @cancel.prevent="closeOperation"><form @submit.prevent="submitOperation"><div class="dialog-icon"><i class="material-symbols" :textContent="operation === 'trash' ? 'delete' : operation === 'restore' ? 'restore' : 'drive_file_move'" aria-hidden="true"></i></div><h2>{{ operationTitle }}</h2><p v-if="operation === 'trash'">{{ $t('organizer.theseItemsWillMoveToRecoverableTrashIncludingEverythingInside') }}</p><p v-else-if="operation === 'restore'">{{ $t('organizer.thisReturnsTheItemToItsOriginalLocationIfThat') }}</p><p v-else>{{ $t('organizer.chooseADestinationForThese') }}{{ operationItems.length }}{{ $t('organizer.itemsExistingFilesWillNeverBeOverwritten') }}</p><div v-if="['move','copy'].includes(operation)" class="dialog-destination"><label>{{ $t('organizer.destinationSource') }}<select v-model="destination.source"><option v-for="name in sources" :key="name">{{ name }}</option></select></label><label>{{ $t('organizer.destinationFolder') }}<input v-model="destination.path" required placeholder="/"/></label><button type="button" @click="browseFromDialog">{{ $t('organizer.browseFolders') }}</button></div><p v-if="operationItems.length > 2000" class="dialog-error" role="alert">{{ $t('organizer.aJobSupportsUpTo2000SelectedItemsSelect') }}</p><ul class="operation-summary"><li v-for="item in operationItems.slice(0, 8)" :key="itemKey(item)">{{ item.name || item.path }}<small>{{ item.source }}{{ $t('organizer.separator3') }}{{ item.path }}</small></li><li v-if="operationItems.length > 8">{{ $t('organizer.and') }}{{ operationItems.length - 8 }}{{ $t('organizer.more') }}</li></ul><p class="dialog-error" v-if="operationError" role="alert">{{ operationError }}</p><div class="dialog-actions"><button type="button" :disabled="submitting" @click="closeOperation">{{ $t('organizer.cancel') }}</button><button class="primary" type="submit" :disabled="submitting || operationItems.length > 2000">{{ submitting ? $t('organizer.starting') : `${operation === 'trash' ? 'Move to trash' : operation === 'restore' ? 'Restore' : operation === 'copy' ? 'Copy' : 'Move'} ${operationItems.length} ${operationItems.length === 1 ? 'item' : 'items'}` }}</button></div></form></dialog>
     <Prompts/><Notifications/><Toast :toasts="toasts"/>
@@ -58,7 +188,7 @@ import { generateRandomCode } from '@/utils/auth';
 import { buildItemUrl, getParentDir, goToItem } from '@/utils/url';
 import { uploadManager } from '@/utils/upload';
 import { downloadManager } from '@/utils/downloadManager';
-import { favoritesKey, formatBytes, isFolder, itemKey, normalizePath, readPreviewText, selectRange, virtualWindow, visibleItems } from '@/utils/organizer';
+import { duplicateReviewSelection, favoritesKey, formatBytes, isFolder, itemKey, normalizePath, organizerFilterCount, readPreviewText, selectRange, virtualWindow, visibleItems } from '@/utils/organizer';
 import Prompts from '@/components/prompts/Prompts.vue';
 import Notifications from '@/components/Notifications.vue';
 import Toast from '@/components/Toast.vue';
@@ -108,7 +238,7 @@ const pageTitle = computed(() => tab.value === 'files' ? path.value === '/' ? 'M
 const sectionSubtitle = computed(() => ({ files: 'LESS CLUTTER. MORE CLARITY.', library: 'SEE THE BIGGER PICTURE.', activity: 'A PLACE FOR PROGRESS.', trash: 'ROOM TO CHANGE YOUR MIND.' }[tab.value]));
 const sectionDescription = computed(() => ({ files: 'Find it, make space for it, put it where it belongs.', library: 'One view across your folders. Find the details that matter.', activity: 'Keep an eye on the work happening in the background.', trash: 'Review what you’ve set aside. Bring it back when you need it.' }[tab.value]));
 const displayed = computed(() => tab.value === 'library' ? libraryItems.value : visibleItems(files.value, query.value, category.value, sort.value, direction.value, { minSize: minSize.value, maxSize: maxSize.value, modifiedAfter: modifiedAfter.value, modifiedBefore: modifiedBefore.value }));
-const activeFilterCount = computed(() => [query.value, category.value, minSize.value, maxSize.value, modifiedAfter.value, modifiedBefore.value].filter(Boolean).length);
+const activeFilterCount = computed(() => organizerFilterCount(query.value, category.value, { minSize: minSize.value, maxSize: maxSize.value, modifiedAfter: modifiedAfter.value, modifiedBefore: modifiedBefore.value }));
 const rowHeight = computed(() => density.value === 'compact' ? 46 : 64);
 const windowRows = computed(() => virtualWindow(displayed.value.length, scrollTop.value, viewportHeight.value, rowHeight.value));
 const rendered = computed(() => displayed.value.slice(windowRows.value.start, windowRows.value.end));
@@ -249,7 +379,17 @@ async function submitOperation() {
 }
 async function jobAction(job, action) { try { if (action === 'cancel') await organizerApi.cancelJob(job.id); else await organizerApi.retryJob(job.id); await refresh(); } catch(e) { error.value = e.message; } }
 async function startScan() { try { scan.value = await organizerApi.scan({ source: source.value, path: path.value }); notice.value = 'Library scan started. You can leave this page while it runs.'; await refresh(); } catch(e) { error.value = e.message; } }
-function selectDuplicates(group) { const keeperKey = keepers.value[group.sha256] || itemKey(group.files[0]); const keeperFile = group.files.find(f => itemKey(f) === keeperKey); if (!keeperFile) return; const extras = group.files.filter(f => itemKey(f) !== keeperKey); selection.value = new Set(extras.map(itemKey)); selectedFiles.value = extras; duplicateSnapshots.clear(); for (const file of extras) duplicateSnapshots.set(itemKey(file), { ...file, sha256: group.sha256, keeper: { source: keeperFile.source, path: keeperFile.path } }); notice.value = `${extras.length} duplicate copies selected. The keeper remains untouched. Review the selection before moving or trashing.`; }
+function selectDuplicates(group) {
+  const review = duplicateReviewSelection(group, keepers.value[group.sha256] || itemKey(group.files[0]));
+  if (!review.keeper) return;
+  selection.value = new Set(review.copies.map(itemKey));
+  selectedFiles.value = review.copies;
+  duplicateSnapshots.clear();
+  for (const snapshot of review.snapshots) {
+    duplicateSnapshots.set(snapshot.key, { sha256: snapshot.sha256, keeper: snapshot.keeper });
+  }
+  notice.value = `${review.copies.length} duplicate copies selected. The keeper remains untouched. Review the selection before moving or trashing.`;
+}
 function chooseKeeper(group, file) { keepers.value[group.sha256] = itemKey(file); clearSelection(); notice.value = 'Keeper changed. Select the other copies again to review cleanup.'; }
 
 watch([query, category, sort, direction, minSize, maxSize, modifiedAfter, modifiedBefore], () => { clearTimeout(queryTimer); clearSelection(); resetScroll(); if (tab.value === 'library') { offset.value = 0; queryTimer = setTimeout(() => { void refresh(); }, 250); } });
@@ -301,4 +441,269 @@ onBeforeUnmount(() => { disposed = true; requestSerial++; clearInterval(pollTime
 @media(max-width:850px){.workspace-nav{width:72px;padding:26px 10px}.workspace-brand{margin:0 auto 40px}.workspace-brand>span:last-child,.nav-caption,.nav-hint,.favorite-link,.nav-heading,.nav-bottom>span,.workspace-nav nav button:not(.active) .nav-count{display:none!important}.workspace-nav nav button{font-size:0;justify-content:center;padding:12px}.workspace-nav nav button i{font-size:23px}.workspace-nav nav button .nav-count{position:absolute;margin:0 0 24px 30px;font-size:9px}.nav-bottom{padding:20px 8px 0;justify-content:center}.nav-bottom a{margin:0}.workspace-top{height:68px}.workspace-content{padding:28px 24px}.selection-bar{left:calc(50% + 36px)}.browser-tools{flex-wrap:wrap}.filter-input{flex-basis:100%;margin-bottom:4px}.browser-tools>select{flex:1;max-width:none!important;font-size:10px}.browser-tools button{flex:none}.detail-panel{width:240px}.with-side .table-heading,.with-side .file-row{grid-template-columns:18px minmax(100px,1fr)}.with-side .file-size,.with-side .table-heading>span:nth-child(4){display:none}.list-caption>span:last-child{display:none}.workspace-eyebrow{font-size:11px}.page-heading{margin-bottom:26px}.page-description{font-size:12px;max-width:300px}.page-heading>.primary{font-size:11px;padding:9px 12px}.top-actions{gap:15px}.duplicates-panel .section-heading>span{display:none}.duplicate-summary>span{display:none}.duplicate-file{font-size:10px}}
 @media(max-width:600px){.organizer{display:block}.workspace-nav{position:fixed;bottom:0;left:0;right:0;width:100%;height:62px;z-index:5;padding:4px 12px;flex-direction:row;border-right:0;border-top:1px solid var(--line);background:#f7f9f2}.workspace-brand,.nav-bottom{display:none}.workspace-nav nav{display:flex;justify-content:space-around;flex:1;gap:4px}.workspace-nav nav button{font-size:9px;display:flex;flex-direction:column;gap:0;padding:4px 16px;min-width:60px}.workspace-nav nav button i{font-size:22px}.workspace-nav nav button .nav-count{margin:0 0 24px 34px}.workspace-main{height:calc(100dvh - 62px);padding-bottom:80px}.workspace-top{padding-inline:19px;height:58px}.workspace-content{padding:26px 16px}.workspace-eyebrow{font-size:10px}.top-actions{gap:12px}.top-actions button{padding:4px;font-size:10px;gap:4px}.top-actions>a{display:none}.user-avatar{width:26px;height:26px}.organizer h1{font-size:30px}.eyebrow{font-size:8px;letter-spacing:1.4px}.page-description{font-size:11px;max-width:240px}.page-heading{align-items:flex-start;gap:12px}.page-heading>.primary{font-size:0;min-height:38px;width:40px;padding:8px;margin-top:22px;gap:0}.page-heading>.primary i{font-size:21px}.location-bar{margin-bottom:16px}.location-bar select{max-width:105px;padding-inline:4px;font-size:10px}.location-bar>button{padding:3px}.location-bar>button .material-symbols{font-size:18px}.address-form input{padding-inline:4px!important;font-size:11px!important}.address-form button{padding:3px}.table-heading,.file-row{grid-template-columns:16px minmax(125px,1fr) 65px;gap:9px;padding-inline:12px}.file-date,.table-heading>span:nth-child(3){display:none}.file-name{gap:8px}.name-lines strong{font-size:11px}.file-icon{width:27px;height:30px}.file-size{font-size:10px}.list-caption{padding-inline:12px;height:40px}.virtual-list{height:48vh;min-height:260px}.selection-bar{left:50%;bottom:76px;max-width:calc(100vw - 20px);gap:2px;padding:8px 9px;box-shadow:0 8px 30px #233c3238}.selection-bar button{font-size:9px;padding:5px 7px;gap:4px;flex-direction:column}.selection-bar button i{font-size:18px}.selection-bar strong{font-size:10px;margin:0 3px}.selection-divider{margin-inline:3px}.selection-bar .clear-selection{align-self:center}.browser-layout.with-side{display:block}.detail-panel{width:100%;margin-top:18px}.with-side .table-heading,.with-side .file-row{grid-template-columns:16px minmax(125px,1fr) 65px}.with-side .file-size,.with-side .table-heading>span:nth-child(4){display:block}.preview-image{max-height:280px}.activity-list,.trash-list{padding:18px 14px}.section-heading h2{font-size:15px}.section-note{font-size:11px}.job-card{padding:15px}.trash-row{gap:9px;flex-wrap:wrap}.trash-row>span:not(.file-icon){display:none}.index-status{align-items:flex-start;flex-wrap:wrap;font-size:10px}.index-status>span{flex:1}.index-status button{margin-left:24px}.duplicates-panel{padding:16px}.duplicate-summary{gap:7px;font-size:10px;flex-wrap:wrap}.duplicate-summary button{font-size:9px}.duplicate-file .keeper-label{font-size:8px}}
 @media(prefers-reduced-motion:reduce){.file-row{transition:none}.loading-ring{animation:none}}
+</style>
+
+<style scoped>
+.browser-tools {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.browser-tools .filter-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding-inline: 0.9rem;
+  border: 1px solid var(--surfaceSecondary);
+  border-radius: 9px;
+  background: var(--background);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.browser-tools .filter-input:focus-within {
+  border-color: var(--primaryColor);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primaryColor) 15%, transparent);
+}
+
+.browser-tools .filter-input input {
+  min-width: 0;
+  height: 2.8rem;
+  font-size: 0.875rem;
+}
+
+.browser-tools .filter-input kbd {
+  flex: 0 0 auto;
+  min-width: 1.35rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--surfaceSecondary);
+  border-radius: 4px;
+  background: #f8faf6;
+  text-align: center;
+}
+
+.browser-filter-controls,
+.browser-view-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.browser-filter-controls select,
+.browser-view-controls select {
+  min-width: 0;
+  max-width: 11rem;
+  height: 2.8rem;
+  border: 1px solid var(--surfaceSecondary);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.browser-filter-controls button,
+.browser-view-controls button {
+  min-width: 2.8rem;
+  min-height: 2.8rem;
+  border: 1px solid var(--surfaceSecondary);
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.browser-filter-controls .filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.browser-filter-controls .filter-toggle.active,
+.browser-filter-controls .filter-toggle:has(.filter-count) {
+  border-color: color-mix(in srgb, var(--primaryColor) 45%, var(--surfaceSecondary));
+  color: var(--primaryColor);
+}
+
+.filter-count {
+  display: inline-grid;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding-inline: 0.15rem;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primaryColor) 12%, white);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.index-status {
+  align-items: flex-start;
+  color: var(--textSecondary);
+}
+
+.index-details {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  min-width: 0;
+}
+
+.scan-scope {
+  color: var(--textPrimary);
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.scan-state {
+  color: var(--primaryColor);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.scan-state--failed,
+.scan-state--error {
+  color: #ad543f;
+}
+
+.scan-error {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+
+.duplicate-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--surfaceSecondary);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--primaryColor);
+}
+
+.duplicates-panel {
+  border-color: color-mix(in srgb, var(--primaryColor) 18%, var(--surfaceSecondary));
+  box-shadow: 0 8px 24px rgb(35 59 53 / 5%);
+}
+
+.duplicate-group {
+  padding: 0.9rem 0.55rem;
+  border-radius: 8px;
+}
+
+.duplicate-group + .duplicate-group {
+  margin-top: 0.25rem;
+}
+
+.duplicate-summary {
+  flex-wrap: wrap;
+}
+
+.duplicate-summary .select-other-copies {
+  min-height: 2.4rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 7px;
+  color: var(--primaryColor);
+  white-space: nowrap;
+}
+
+.duplicate-file {
+  min-width: 0;
+  padding: 0.6rem 0.55rem;
+  border-radius: 6px;
+  color: var(--textSecondary);
+  transition: background-color 120ms ease;
+}
+
+.duplicate-file.is-keeper {
+  background: color-mix(in srgb, var(--primaryColor) 9%, white);
+  color: var(--textPrimary);
+}
+
+.duplicate-path {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.keeper-label {
+  min-width: 3.6rem;
+}
+
+@media (width <= 1050px) {
+  .browser-tools {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .browser-tools .filter-input {
+    grid-column: 1 / -1;
+  }
+
+  .browser-filter-controls {
+    justify-self: start;
+  }
+
+  .browser-view-controls {
+    justify-self: end;
+  }
+}
+
+@media (width <= 680px) {
+  .browser-tools {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.55rem;
+  }
+
+  .browser-tools .filter-input {
+    grid-column: auto;
+  }
+
+  .browser-filter-controls,
+  .browser-view-controls {
+    width: 100%;
+    justify-self: stretch;
+    flex-wrap: wrap;
+  }
+
+  .browser-filter-controls select,
+  .browser-view-controls select {
+    flex: 1 1 7.5rem;
+    max-width: none;
+  }
+
+  .browser-view-controls {
+    justify-content: flex-start;
+  }
+
+  .index-status {
+    flex-wrap: wrap;
+  }
+
+  .index-details {
+    flex-basis: calc(100% - 2rem);
+  }
+
+  .duplicate-toggle {
+    margin-left: 1.6rem;
+  }
+
+  .duplicate-summary .select-other-copies {
+    margin-left: 0;
+  }
+
+  .duplicate-file {
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browser-tools .filter-input {
+    transition: none;
+  }
+}
 </style>

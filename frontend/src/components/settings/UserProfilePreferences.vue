@@ -46,11 +46,12 @@
         @mouseenter="showEnforcedTooltipIfLocked($event, 'ui', 'themeColor')"
         @mouseleave="hideTooltip"
       >
-        <ButtonGroup
-          :buttons="colorChoices"
-          @button-clicked="setColor"
-          :initialActive="themeColorValue"
-          :is-disabled="fieldDisabled('ui', 'themeColor') || halloweenActive"
+        <ThemeColorPicker
+          :model-value="themeColorValue"
+          :presets="colorChoices"
+          :disabled="fieldDisabled('ui', 'themeColor') || halloweenActive"
+          :label="$t('settings.themeColor')"
+          @update:model-value="setColor"
         />
       </div>
       <template #enforce>
@@ -646,11 +647,12 @@
             @mouseenter="showEnforcedTooltipIfLocked($event, 'ui', 'themeColor')"
             @mouseleave="hideTooltip"
           >
-            <ButtonGroup
-              :buttons="colorChoices"
-              @button-clicked="setColor"
-              :initialActive="themeColorValue"
-              :is-disabled="fieldDisabled('ui', 'themeColor') || halloweenActive"
+            <ThemeColorPicker
+              :model-value="themeColorValue"
+              :presets="colorChoices"
+              :disabled="fieldDisabled('ui', 'themeColor') || halloweenActive"
+              :label="$t('settings.themeColor')"
+              @update:model-value="setColor"
             />
           </div>
           <template #enforce>
@@ -755,7 +757,7 @@ import SettingsItem from "@/components/settings/SettingsItem.vue";
 import SettingsAccordion from "@/components/settings/SettingsAccordion.vue";
 import Languages from "@/components/settings/Languages.vue";
 import ExpandDropdown from "@/components/settings/ExpandDropdown.vue";
-import ButtonGroup from "@/components/ButtonGroup.vue";
+import ThemeColorPicker from "@/components/settings/ThemeColorPicker.vue";
 import SettingsButton from "@/components/settings/SettingsButton.vue";
 
 export default {
@@ -767,7 +769,7 @@ export default {
     SettingsAccordion,
     Languages,
     ExpandDropdown,
-    ButtonGroup,
+    ThemeColorPicker,
     ProfilePreferenceToggle,
     ProfileEnforceSwitch,
     ProfileEnforceableField,
@@ -862,12 +864,12 @@ export default {
     },
     colorChoices() {
       return [
-        { label: this.$t("colors.blue"), value: "var(--blue)" },
-        { label: this.$t("colors.red"), value: "var(--red)" },
-        { label: this.$t("colors.green"), value: "var(--icon-green)" },
-        { label: this.$t("colors.violet"), value: "var(--icon-violet)" },
-        { label: this.$t("colors.yellow"), value: "var(--icon-yellow)" },
-        { label: this.$t("colors.orange"), value: "var(--icon-orange)" },
+        { label: this.$t("colors.blue"), value: "var(--blue)", hex: "#2196f3" },
+        { label: this.$t("colors.red"), value: "var(--red)", hex: "#f44336" },
+        { label: this.$t("colors.green"), value: "var(--icon-green)", hex: "#4caf50" },
+        { label: this.$t("colors.violet"), value: "var(--icon-violet)", hex: "#9b59b6" },
+        { label: this.$t("colors.yellow"), value: "var(--icon-yellow)", hex: "#fdd34b" },
+        { label: this.$t("colors.orange"), value: "var(--icon-orange)", hex: "#ff8c00" },
       ];
     },
     themeOptions() {

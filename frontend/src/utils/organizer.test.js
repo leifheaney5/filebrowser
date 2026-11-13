@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { favoritesKey, itemKey, normalizePath, readPreviewText, selectRange, virtualWindow, visibleItems } from './organizer';
+import { duplicateReviewSelection, favoritesKey, itemKey, normalizePath, organizerFilterCount, readPreviewText, selectRange, virtualWindow, visibleItems } from './organizer.js';
 
 describe('organizing workspace', () => {
   const items = Array.from({ length: 8 }, (_, n) => ({ name: `file ${n}`, source: 'disk', path: `/${n}`, type: 'text/plain' }));
@@ -27,6 +27,29 @@ describe('organizing workspace', () => {
     const files = [{ name: 'b', type: 'directory' }, { name: 'a', size: 10, type: 'image/jpeg' }, { name: 'c', size: 2, type: 'image/png' }];
     expect(visibleItems(files, '', '', 'size', 'asc').map(i => i.name)).toEqual(['b', 'c', 'a']);
     expect(visibleItems(files, '', 'image', 'size', 'asc').map(i => i.name)).toEqual(['c', 'a']);
+  });
+  it('counts only non-empty search and filter values', () => {
+    expect(organizerFilterCount('  ', '', { minSize: '', maxSize: '20', modifiedAfter: '2026-01-01' })).toBe(2);
+  });
+  it('selects duplicate copies without including the chosen keeper and records hash guards', () => {
+    const group = {
+      sha256: 'verified-hash',
+      files: [
+        { source: 'disk', path: '/music/a.mp3' },
+        { source: 'disk', path: '/archive/a-copy.mp3' },
+        { source: 'backup', path: '/a.mp3' },
+      ],
+    };
+    const selected = duplicateReviewSelection(group, itemKey(group.files[1]));
+    expect(selected.keeper).toBe(group.files[1]);
+    expect(selected.copies).toEqual([group.files[0], group.files[2]]);
+    expect(selected.snapshots).toEqual([
+      { key: itemKey(group.files[0]), sha256: 'verified-hash', keeper: { source: 'disk', path: '/archive/a-copy.mp3' } },
+      { key: itemKey(group.files[2]), sha256: 'verified-hash', keeper: { source: 'disk', path: '/archive/a-copy.mp3' } },
+    ]);
+  });
+  it('refuses duplicate selection when a content hash is missing', () => {
+    expect(duplicateReviewSelection({ files: [{ source: 'disk', path: '/a' }] })).toEqual({ keeper: null, copies: [], snapshots: [] });
   });
   it('cancels a text response once the preview byte budget is reached', async () => {
     let cancelled = false;
