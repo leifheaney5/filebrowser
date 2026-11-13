@@ -526,6 +526,12 @@ html.dark-mode .organizer .brand-mark {
   font-size: 22px;
 }
 
+.organizer .workspace-brand .brand-title {
+  font-size: 17px;
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+}
+
 html.dark-mode .organizer .user-avatar {
   color: #f4f7f9;
   background: #34434d;
@@ -594,6 +600,14 @@ html.dark-mode .organizer .file-row.selected,
 html.dark-mode .organizer .duplicate-file.is-keeper {
   background: #263d34;
   color: #f0fff6;
+}
+
+html.dark-mode .organizer .file-row {
+  border-color: #3a4853;
+}
+
+html.dark-mode .organizer .name-lines strong {
+  color: #edf3f7;
 }
 
 html.dark-mode .organizer .table-heading {
